@@ -1,58 +1,53 @@
 {
-  description = "NixOS configuration for dubai";
+  description = "Raspberry Pi 5 NixOS configuration";
+
+  nixConfig = {
+    extra-substituters = [
+      "https://nixos-raspberrypi.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "nixos-raspberrypi.cachix.org-1:4iMO9LXa8BqhU+Rpg6LQKiGa2lsNh/j2oiYLNOQ5sPI="
+    ];
+  };
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
-
-    homelab.url = "git+ssh://git@github.com/GrimOutlook/nix-homelab";
-
-    nix-config = {
-      url = "github:GrimOutlook/nix-config";
+    agenix = {
+      url = "github:ryantm/agenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixos-raspberrypi = {
+      url = "github:nvmd/nixos-raspberrypi/main";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    disko = {
+      url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
   outputs =
-    inputs@{
+    {
       self,
-      nix-config,
+      agenix,
+      disko,
+      nixpkgs,
+      nixos-raspberrypi,
       ...
-    }:
-    nix-config.inputs.flake-parts.lib.mkFlake { inherit inputs; } (
-      let
-        homelab = inputs.homelab.nixosModules.default;
-        host-info = rec {
-          name = "dubai";
-          flake = "github:GrimOutlook/nix-host-${name}";
-        };
-      in
-      {
-        imports = [
-          nix-config.modules.flake.hosts
-          nix-config.modules.flake.host-info
-          (nix-config + "/flakes/systems.nix")
-        ];
-        inherit host-info;
+    }@inputs:
+    {
+      nixosConfigurations.dubai = nixos-raspberrypi.lib.nixosSystem {
+        specialArgs = inputs;
         modules = [
-          "pi"
+          agenix.nixosModules.default
+          disko.nixosModules.disko
+          ./configurations.nix
+          ./disko.nix
         ];
-        nixos = {
-          imports = [
-            ./hardware
-            (import ./services rec {
-              inherit homelab;
-              inherit host-info;
-              host = homelab.hosts.${host-info.name};
-            })
-          ];
+      };
 
-          system = {
-            stateVersion = "25.05";
-          };
-        };
-        home = {
-          home.stateVersion = "25.11";
-        };
-      }
-    );
+      # Build the SD card image with:
+      # nix build .#sdImages.yourHostname
+      sdImages.dubai = self.nixosConfigurations.dubai.config.system.build.sdImage;
+    };
 }
