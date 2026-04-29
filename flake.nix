@@ -36,8 +36,7 @@
         specialArgs = inputs;
         modules = [
           disko.nixosModules.disko
-          ./configurations.nix
-          ./disko.nix
+          ./modules
         ];
       };
 
