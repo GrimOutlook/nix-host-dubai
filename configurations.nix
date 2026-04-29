@@ -22,19 +22,22 @@
   # ------------------------------------------------------------------ #
   hardware.raspberry-pi.config = {
     all.options = {
-      # # HDMI force hotplug so the display works even without a monitor at boot
-      # hdmi_force_hotplug.enable = true;
+      hdmi_force_hotplug = {
+        # HDMI force hotplug so the display works even without a monitor at boot
+        enable = true;
+        value = true;
+      };
       # GPU memory split (MB) — tune as needed
       gpu_mem = {
         enable = true;
         value = 128;
       };
       # existing options...
-      # Boot order: 0x6 = NVMe, 0x1 = SD, 0x4 = USB
+      # Boot order: 0x6 = NVMe, 0x1 = SD, 0x4 = USB, 0xF = Reboot
       # Full order: try NVMe first, fall back to SD
       boot_order = {
         enable = true;
-        value = "0xf46";
+        value = "0xf461";
       };
       dtparam_pciex1 = {
         enable = true;
@@ -43,20 +46,13 @@
     };
   };
 
-  age.secrets.wifi.file = ./secrets/wifi.age;
-
   # ------------------------------------------------------------------ #
   # Networking                                                           #
   # ------------------------------------------------------------------ #
   networking = {
     hostName = "dubai";
     useDHCP = lib.mkDefault true;
-    # Uncomment to configure WiFi:
-    wireless = {
-      enable = true;
-      secretsFile = config.age.secrets.wifi.path;
-      networks."MLH".pskRaw = "ext:psk_home";
-    };
+    networkmanager.enable = true;
   };
 
   # ------------------------------------------------------------------ #
@@ -64,6 +60,7 @@
   # ------------------------------------------------------------------ #
   users.users.pi = {
     isNormalUser = true;
+    initialHashedPassword = "$y$j9T$B1twhXiwjRRijxI5.sKdD.$ezIbul2rpq59cT/zHUDgeVygGVXcq01LDiyb4GFc79/";
     extraGroups = [
       "wheel"
       "gpio"

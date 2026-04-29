@@ -11,10 +11,6 @@
   };
 
   inputs = {
-    agenix = {
-      url = "github:ryantm/agenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     nixos-raspberrypi = {
       url = "github:nvmd/nixos-raspberrypi/main";
@@ -39,7 +35,6 @@
       nixosConfigurations.dubai = nixos-raspberrypi.lib.nixosSystem {
         specialArgs = inputs;
         modules = [
-          agenix.nixosModules.default
           disko.nixosModules.disko
           ./configurations.nix
           ./disko.nix
