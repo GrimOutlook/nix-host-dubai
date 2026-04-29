@@ -60,7 +60,7 @@
   # ------------------------------------------------------------------ #
   users.users.pi = {
     isNormalUser = true;
-    initialHashedPassword = "$y$j9T$B1twhXiwjRRijxI5.sKdD.$ezIbul2rpq59cT/zHUDgeVygGVXcq01LDiyb4GFc79/";
+    initialPassword = "raspberry";
     extraGroups = [
       "wheel"
       "gpio"
