@@ -17,6 +17,8 @@
       "climate"
       "generic_thermostat"
       "switch"
+
+      "mqtt"
     ];
     customComponents = with pkgs.home-assistant-custom-components; [
       frigate

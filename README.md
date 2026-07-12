@@ -6,6 +6,8 @@
 | --- | --- |
 | [plex](https://github.com/plexinc) | Media Server |
 | [vaultwarden](https://github.com/dani-garcia/vaultwarden) | Password Manager |
+| [home-assistant](https://github.com/home-assistant/core) | Home Automation |
+| [mosquitto](https://github.com/eclipse/mosquitto) | MQTT Broker (used by Home Assistant's Frigate integration) |
 
 ## TODO:
 
