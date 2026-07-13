@@ -24,6 +24,7 @@
       url = "github:ryantm/agenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    homelab.url = "git+ssh://git@github.com/GrimOutlook/nix-homelab";
   };
 
   outputs =

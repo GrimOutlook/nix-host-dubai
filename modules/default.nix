@@ -3,6 +3,5 @@
     ./configurations.nix
     ./disko.nix
     ./home-assistant
-    ./mosquitto.nix
   ];
 }

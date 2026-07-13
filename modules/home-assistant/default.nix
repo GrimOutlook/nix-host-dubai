@@ -1,5 +1,16 @@
-{ lib, pkgs, ... }:
+{ lib, pkgs, homelab, ... }:
 {
+  # Shared credential for the MQTT broker hosted on newyork (see nix-homelab).
+  # Home Assistant no longer supports configuring the MQTT broker connection
+  # declaratively (broker/username/password moved to UI-only config flow), so
+  # this just makes the password available for the one-time manual setup:
+  # Settings > Devices & Services > Add Integration > MQTT
+  #   broker:   newyork (homelab.hosts.newyork.net.ip)
+  #   port:     1883
+  #   username: frigate
+  #   password: `cat /run/agenix/mqtt-password` on this host
+  age.secrets.mqtt-password.file = "${homelab}/secrets/mqtt-password.age";
+
   services.home-assistant = {
     enable = true;
     openFirewall = true;

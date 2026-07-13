@@ -117,6 +117,24 @@
         "type": "github"
       }
     },
+    "homelab": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1783924302,
+        "narHash": "sha256-eDRggjcudjbPH5VvCWUGDrBkkb6QqMjwIfYpLwCVkaE=",
+        "ref": "refs/heads/main",
+        "rev": "1cdf47992d7e9d5fb87d46c9de15dabe2b819cf5",
+        "revCount": 74,
+        "type": "git",
+        "url": "ssh://git@github.com/GrimOutlook/nix-homelab"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/GrimOutlook/nix-homelab"
+      }
+    },
     "nixos-images": {
       "inputs": {
         "nixos-stable": [
@@ -169,6 +187,20 @@
     },
     "nixpkgs": {
       "locked": {
+        "lastModified": 1775095191,
+        "narHash": "sha256-CsqRiYbgQyv01LS0NlC7shwzhDhjNDQSrhBX8VuD3nM=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "106eb93cbb9d4e4726bf6bc367a3114f7ed6b32f",
+        "type": "github"
+      },
+      "original": {
+        "id": "nixpkgs",
+        "type": "indirect"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
         "lastModified": 1767313136,
         "narHash": "sha256-16KkgfdYqjaeRGBaYsNrhPRRENs0qzkQVUooNHtoy2w=",
         "owner": "NixOS",
@@ -187,8 +219,9 @@
       "inputs": {
         "agenix": "agenix",
         "disko": "disko",
+        "homelab": "homelab",
         "nixos-raspberrypi": "nixos-raspberrypi",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs_2"
       }
     },
     "systems": {
