@@ -39,6 +39,16 @@
       # Includes dependencies for a basic setup
       # https://www.home-assistant.io/integrations/default_config/
       default_config = { };
+      # Requests are reverse-proxied by caddy on newyork before reaching
+      # this host, so Home Assistant needs to trust it to honor the
+      # X-Forwarded-* headers it sets. Without this, external access
+      # through the proxy fails with "400: Bad Request" complaining that
+      # Home Assistant isn't set up for reverse proxies.
+      # https://www.home-assistant.io/integrations/http/#reverse-proxies
+      http = {
+        use_x_forwarded_for = true;
+        trusted_proxies = [ homelab.hosts.newyork.net.ip ];
+      };
       homeassistant = {
         name = "Longleaf";
         temperature_unit = "F";
