@@ -83,6 +83,45 @@
           };
         }
       ];
+      automation = [
+        {
+          alias = "Frigate alert notification";
+          description = "Push notification when Frigate creates a new alert review item.";
+          trigger = [
+            {
+              platform = "mqtt";
+              topic = "frigate/reviews";
+            }
+          ];
+          # Frigate publishes "new", "update", and "end" messages as a single
+          # review item's clip is finalized. Filter to "new" so only one
+          # notification is sent per alert instead of one per update.
+          condition = [
+            {
+              condition = "template";
+              value_template = "{{ trigger.payload_json['type'] == 'new' }}";
+            }
+            {
+              condition = "template";
+              value_template = "{{ trigger.payload_json['after']['severity'] == 'alert' }}";
+            }
+          ];
+          action = [
+            {
+              service = "notify.mobile_app_pixel_10";
+              data = {
+                title = "Frigate Alert";
+                message = "{{ trigger.payload_json['after']['data']['objects'] | sort | join(', ') | title }} detected on {{ trigger.payload_json['after']['camera'] }}";
+                data = {
+                  image = "https://homeassistant.grimaldifamily.org/api/frigate/notifications/{{ trigger.payload_json['after']['id'] }}/thumbnail.jpg";
+                  tag = "{{ trigger.payload_json['after']['id'] }}";
+                };
+              };
+            }
+          ];
+          mode = "single";
+        }
+      ];
     };
   };
   users.groups.gpio.members = [ "hass" ];
