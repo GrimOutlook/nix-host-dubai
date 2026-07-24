@@ -93,17 +93,27 @@
               topic = "frigate/reviews";
             }
           ];
-          # Frigate publishes "new", "update", and "end" messages as a single
-          # review item's clip is finalized. Filter to "new" so only one
-          # notification is sent per alert instead of one per update.
+          # Frigate publishes "new", "update", and "end" messages over a review
+          # item's lifetime. A review item's severity is NOT fixed when it is
+          # created: Frigate frequently opens an item as "detection" and only
+          # upgrades it to "alert" in a later "update" message (once the object
+          # is confirmed / enters an alert zone). Filtering on
+          # `type == 'new' and severity == 'alert'` therefore silently drops
+          # every alert that escalates after creation -- which is most of them.
+          #
+          # Instead, fire once on the transition INTO alert severity: any
+          # non-"end" message where severity just became "alert" (before != alert,
+          # after == alert). This catches both alerts that start as alerts and
+          # alerts promoted from detection, while the `tag` (review id) below
+          # dedupes any repeats.
           condition = [
             {
               condition = "template";
-              value_template = "{{ trigger.payload_json['type'] == 'new' }}";
-            }
-            {
-              condition = "template";
-              value_template = "{{ trigger.payload_json['after']['severity'] == 'alert' }}";
+              value_template = ''
+                {{ trigger.payload_json['type'] != 'end'
+                   and trigger.payload_json['after']['severity'] == 'alert'
+                   and trigger.payload_json['before']['severity'] != 'alert' }}
+              '';
             }
           ];
           action = [
@@ -113,7 +123,15 @@
                 title = "Frigate Alert";
                 message = "{{ trigger.payload_json['after']['data']['objects'] | sort | join(', ') | title }} detected on {{ trigger.payload_json['after']['camera'] }}";
                 data = {
-                  image = "https://homeassistant.grimaldifamily.org/api/frigate/notifications/{{ trigger.payload_json['after']['id'] }}/thumbnail.jpg";
+                  # Relative path, not the public https URL. The companion app
+                  # downloads the notification image before it displays the
+                  # notification, so a slow fetch delays the whole alert. A
+                  # relative /api/... path is resolved against whichever HA URL
+                  # the app is already connected to (the internal LAN URL when
+                  # home), avoiding the WAN -> caddy(newyork) -> HA(dubai) ->
+                  # frigate(pyongyang) round trip the hard-coded external URL
+                  # forced on every notification.
+                  image = "/api/frigate/notifications/{{ trigger.payload_json['after']['id'] }}/thumbnail.jpg";
                   tag = "{{ trigger.payload_json['after']['id'] }}";
                 };
               };
