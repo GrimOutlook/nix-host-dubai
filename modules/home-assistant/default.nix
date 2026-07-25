@@ -142,6 +142,23 @@
       ];
     };
   };
+  # The Living Room TV (busan, MAC 7c:0a:3f:79:bb:8a in homelab/hosts.nix,
+  # DHCP-reserved at 10.1.0.4) constantly probes Home Assistant's UPnP/SSDP
+  # event-callback port (tcp/40000) -- roughly 200 SYNs an hour. HA is not
+  # actually consuming that traffic (no DLNA/cast integration is configured),
+  # so we do NOT want to open the port; we just want to stop it flooding the
+  # kernel firewall log. The default nixos-fw chain sends every unmatched
+  # packet to `nixos-fw-log-refuse`, which LOGs ("refused connection: ") and
+  # then DROPs. Inserting a silent DROP for exactly this source+port at the
+  # top of the chain drops the probes before they reach the logging rule.
+  #
+  # Note: extraCommands only applies with the iptables firewall backend
+  # (networking.nftables.enable = false, the default on this host). The TV
+  # connects over IPv4, so an iptables (v4) rule is sufficient.
+  networking.firewall.extraCommands = ''
+    iptables -I nixos-fw -p tcp -s 10.1.0.4 --dport 40000 -j DROP
+  '';
+
   users.groups.gpio.members = [ "hass" ];
   # Ensure the gpio group owns the device
   services.udev.extraRules = ''
