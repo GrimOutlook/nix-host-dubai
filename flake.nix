@@ -42,6 +42,7 @@
         modules = [
           disko.nixosModules.disko
           agenix.nixosModules.default
+          inputs.homelab.nixosModules.default
           ./modules
         ];
       };
