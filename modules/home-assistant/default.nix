@@ -75,6 +75,8 @@
       };
 
       # Alert integration: notifies when someone is detected at the front door
+      # TODO: Change repeat to 0.5 (30 second intervals) until the front door is
+      # opened or the alert is dismissed. Do this once door opening detection is added.
       alert = {
         front_door_person = {
           name = "Person at Front Door";
