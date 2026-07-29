@@ -133,6 +133,31 @@
                   # forced on every notification.
                   image = "/api/frigate/notifications/{{ trigger.payload_json['after']['id'] }}/thumbnail.jpg";
                   tag = "{{ trigger.payload_json['after']['id'] }}";
+
+                  # Delivery priority. Without these, the push is sent to FCM at
+                  # normal priority, which Android is free to hold until the
+                  # device next leaves Doze -- which is why alerts "arrive" all
+                  # at once the moment the phone is unlocked. Exempting the
+                  # companion app from battery optimization does NOT fix this:
+                  # the priority is chosen by the *sender*, not the app.
+                  # `priority: high` + `ttl: 0` tells FCM to wake the device and
+                  # deliver now, or drop it rather than queue it. This is the
+                  # same class of push messaging apps use, and it is what the
+                  # companion docs prescribe for notifications that must ring
+                  # before the screen is turned on.
+                  ttl = 0;
+                  priority = "high";
+
+                  # Dedicated notification channel so these can be given their
+                  # own importance/sound without affecting every other HA
+                  # notification. NOTE: on Android 8+, a channel's importance is
+                  # fixed the FIRST time the channel is seen and can afterwards
+                  # only be *lowered* -- so this must be a channel name that has
+                  # not been used before (the default is "General"). If the
+                  # importance ever needs raising again, change this string or
+                  # adjust the channel in Android's notification settings.
+                  channel = "Frigate Alerts";
+                  importance = "high";
                 };
               };
             }
