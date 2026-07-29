@@ -15,24 +15,32 @@
     enable = true;
     openFirewall = true;
     configWritable = false; # Complete Nix management: configuration.yaml is read-only in the Nix store
+    lovelaceConfigWritable = false; # Read-only declarative UI dashboard
 
-    extraConfigFiles."ui-lovelace.yaml" = ''
-      title: Longleaf
-      views:
-        - title: Overview
-          cards:
-            - type: entities
-              title: Switches
-              entities:
-                - switch.port5
-                - switch.port6
-                - switch.port13
-                - switch.port16
-                - switch.port19
-                - switch.port20
-                - switch.port21
-                - switch.port26
-    '';
+    lovelaceConfig = {
+      title = "Longleaf";
+      views = [
+        {
+          title = "Overview";
+          cards = [
+            {
+              type = "entities";
+              title = "Switches";
+              entities = [
+                "switch.port5"
+                "switch.port6"
+                "switch.port13"
+                "switch.port16"
+                "switch.port19"
+                "switch.port20"
+                "switch.port21"
+                "switch.port26"
+              ];
+            }
+          ];
+        }
+      ];
+    };
 
     extraComponents = [
       # Components required to complete the onboarding
@@ -56,11 +64,6 @@
       gpio
     ];
     config = {
-      # Declarative Lovelace Dashboard (YAML mode)
-      lovelace = {
-        mode = "yaml";
-      };
-
       # Declarative scripts & scenes
       script = { };
       scene = [ ];
