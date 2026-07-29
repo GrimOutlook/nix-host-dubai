@@ -68,6 +68,11 @@
       script = { };
       scene = [ ];
 
+      # Frigate NVR integration (running on pyongyang host)
+      frigate = {
+        url = "http://${homelab.hosts.pyongyang.net.ip}:5000";
+      };
+
       # Includes dependencies for a basic setup
       # https://www.home-assistant.io/integrations/default_config/
       default_config = { };
