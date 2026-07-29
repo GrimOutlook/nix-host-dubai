@@ -14,6 +14,26 @@
   services.home-assistant = {
     enable = true;
     openFirewall = true;
+    configWritable = false; # Complete Nix management: configuration.yaml is read-only in the Nix store
+
+    extraConfigFiles."ui-lovelace.yaml" = ''
+      title: Longleaf
+      views:
+        - title: Overview
+          cards:
+            - type: entities
+              title: Switches
+              entities:
+                - switch.port5
+                - switch.port6
+                - switch.port13
+                - switch.port16
+                - switch.port19
+                - switch.port20
+                - switch.port21
+                - switch.port26
+    '';
+
     extraComponents = [
       # Components required to complete the onboarding
       "analytics"
@@ -36,6 +56,15 @@
       gpio
     ];
     config = {
+      # Declarative Lovelace Dashboard (YAML mode)
+      lovelace = {
+        mode = "yaml";
+      };
+
+      # Declarative scripts & scenes
+      script = { };
+      scene = [ ];
+
       # Includes dependencies for a basic setup
       # https://www.home-assistant.io/integrations/default_config/
       default_config = { };
