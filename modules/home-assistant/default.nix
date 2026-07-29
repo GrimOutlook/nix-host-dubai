@@ -58,6 +58,7 @@
       "switch"
 
       "mqtt"
+      "alert"
     ];
     customComponents = with pkgs.home-assistant-custom-components; [
       frigate
@@ -71,6 +72,29 @@
       # Frigate NVR integration (running on pyongyang host)
       frigate = {
         url = "http://${homelab.hosts.pyongyang.net.ip}:5000";
+      };
+
+      # Alert integration: notifies when someone is detected at the front door
+      alert = {
+        front_door_person = {
+          name = "Person at Front Door";
+          title = "Front Door Alert";
+          message = "Someone is detected at the front door!";
+          entity_id = "binary_sensor.front_door_person_occupancy";
+          state = "on";
+          repeat = [ 2 5 10 ];
+          can_acknowledge = true;
+          skip_first = false;
+          notifiers = [
+            "mobile_app_pixel_10"
+          ];
+          data = {
+            ttl = 0;
+            priority = "high";
+            channel = "Front Door Alerts";
+            importance = "high";
+          };
+        };
       };
 
       # Includes dependencies for a basic setup
