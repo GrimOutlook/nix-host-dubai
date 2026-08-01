@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ lib, pkgs, ... }:
 {
   # Home Assistant's own log never reaches the journal, so the alloy agent the
   # homelab logging module installs does not ship it and nothing downstream can
@@ -52,10 +52,30 @@
 
   systemd.tmpfiles.rules = [
     "d /var/lib/hass 0750 hass hass -"
-    # Home assistant recreates this on each start with whatever the service
-    # umask gives it. 0640 is group-readable either way and drops the world
-    # read that 0644 would otherwise leave on a file full of addresses.
-    "z /var/lib/hass/home-assistant.log 0640 hass hass -"
+  ];
+
+  # The directory being traversable is not enough: the nixos module runs home
+  # assistant with UMask=0077, so it creates its log 0600 and alloy is refused
+  # at the file itself. A tmpfiles rule cannot fix that, because home assistant
+  # rotates the log on every start -- it renames the old one aside and makes a
+  # fresh one, after tmpfiles has already run, so the mode is 0600 again by the
+  # time anything reads it.
+  #
+  # Widening UMask would work and is wrong: it would apply to everything home
+  # assistant writes, and /var/lib/hass holds .storage, secrets and the sqlite
+  # database. Only the log needs to be readable, so only the log is changed,
+  # after the process that owns it has made it. The loop is because
+  # ExecStartPost can fire before home assistant has opened the file.
+  systemd.services.home-assistant.serviceConfig.ExecStartPost = [
+    (pkgs.writeShellScript "home-assistant-log-mode" ''
+      for _ in $(seq 1 60); do
+        if [ -e /var/lib/hass/home-assistant.log ]; then
+          chmod 0640 /var/lib/hass/home-assistant.log
+          exit 0
+        fi
+        sleep 1
+      done
+    '')
   ];
 
   systemd.services.alloy.serviceConfig.SupplementaryGroups = [ "hass" ];
