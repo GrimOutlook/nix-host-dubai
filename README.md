@@ -1,12 +1,46 @@
 # dubai
 
+Raspberry Pi 5 (aarch64, NVMe root) running Home Assistant.
+
 ## Services
 
 | Service | Description |
 | --- | --- |
-| [plex](https://github.com/plexinc) | Media Server |
-| [vaultwarden](https://github.com/dani-garcia/vaultwarden) | Password Manager |
 | [home-assistant](https://github.com/home-assistant/core) | Home Automation (MQTT broker is hosted on `newyork`) |
+
+## Layout
+
+Like every other host in `nix-hosts`, dubai builds on the shared `nix-config`
+flake and is configured through its `host.*` options. It is the one host that
+does **not** go through `nix-config.lib.mkHost`: the Pi needs
+`nixos-raspberrypi.lib.nixosSystem` as its builder, so `flake.nix` reproduces
+what `mkHost` does by hand. See the comments there.
+
+`nixos-raspberrypi` is pinned to the `nixos-<release>` branch matching
+`nix-config`'s nixpkgs, and follows it — moving one to a new NixOS release
+means moving the other in the same commit.
+
+Only a deliberately small slice of `nix-config`'s core capability is enabled;
+`modules/configurations.nix` lists what is turned off and why. The curated CLI
+toolbox (`host.default-programs`) is off, which also means **the login shell
+here is bash, not fish** like on the other hosts.
+
+## Deploying
+
+`nix develop` gives you a `deploy` command (`nh os switch` under the hood).
+Run it on the Pi, or from a workstation, where it targets `root@dubai`:
+
+```sh
+deploy                          # builds locally, activates on dubai
+deploy --build-host root@dubai  # build on the Pi instead of cross/emulated
+```
+
+> **One-time note for the first switch onto this config:** the shared config
+> sets `users.mutableUsers = false` and owns the user list, so the old `pi`
+> account goes away and is replaced by `grim` (same authorized keys, uid 1000).
+> `AllowUsers` becomes `grim` and `root`, so run that first switch from the
+> `pi` account or the console — afterwards it is `ssh grim@dubai`, and `root`
+> from the LAN.
 
 ## TODO:
 

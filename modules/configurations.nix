@@ -1,5 +1,4 @@
 {
-  config,
   lib,
   nixos-raspberrypi,
   pkgs,
@@ -10,6 +9,37 @@
     raspberry-pi-5.base
     raspberry-pi-5.bluetooth # remove if you don't need BT
   ];
+
+  # Users, SSH, sudo, nix settings, agenix, journald and networking all come
+  # from `nix-config` (see `capabilities/core`), same as every other host. Only
+  # the Pi-specific bits live here.
+  #
+  # `raspberry-pi` is the host type rather than `server` because `server` turns
+  # on the bootloader capability (systemd-boot/GRUB), which would fight the
+  # Pi's `boot.loader.raspberry-pi` bootloader below.
+  host = {
+    hostname = "dubai";
+    type.raspberry-pi.enable = true;
+
+    # This is a headless Home Assistant appliance, and anything the aarch64
+    # caches don't already have gets compiled on the Pi itself, so take only
+    # the parts of the core capability that make the host administrable and
+    # consistent with the rest of the homelab, and none of the optional
+    # tooling. Its own small base package set is below.
+    #
+    # `default-programs` is the big one: ~100 curated CLI packages plus the
+    # fish/nixvim/tmux/atuin configs (so the owner's login shell here is bash,
+    # not fish). Flip it back to `true` if dubai ever becomes a machine anyone
+    # works on interactively.
+    default-programs.enable = false;
+    # `docopts`/`pastel`/`ripgrep` plus the shell scripts in nix-config.
+    custom-scripts.enable = false;
+    # The prebuilt nix-index database is a large download that only pays off on
+    # a machine where you go looking for packages by command name.
+    nix-index-database.enable = false;
+    # Desktop file/MIME associations; nothing headless uses them.
+    xdg.enable = false;
+  };
 
   # ------------------------------------------------------------------ #
   # Boot                                                                 #
@@ -49,69 +79,15 @@
   # ------------------------------------------------------------------ #
   # Networking                                                           #
   # ------------------------------------------------------------------ #
-  networking = {
-    hostName = "dubai";
-    useDHCP = lib.mkDefault true;
-    networkmanager.enable = true;
-  };
-
-  # ------------------------------------------------------------------ #
-  # Users                                                                #
-  # ------------------------------------------------------------------ #
-  users.users.pi = {
-    isNormalUser = true;
-    initialPassword = "raspberry";
-    extraGroups = [
-      "wheel"
-      "gpio"
-      "i2c"
-      "spi"
-    ];
-    openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA+VOouatDdN2oqpwfDtzJqDvrx9YJwbvs3of1aZ8Q24"
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIApGjkXLSbpQIvpIFbVeywyS8Y9rk0kQqPT5wjE/QEnX"
-    ];
-  };
-
-  security.sudo.wheelNeedsPassword = false;
-
-  # ------------------------------------------------------------------ #
-  # SSH                                                                  #
-  # ------------------------------------------------------------------ #
-  services.openssh = {
-    enable = true;
-    settings = {
-      PasswordAuthentication = false;
-      PermitRootLogin = "no";
-    };
-  };
-
-  # ------------------------------------------------------------------ #
-  # Nix settings                                                         #
-  # ------------------------------------------------------------------ #
-  nix.settings = {
-    experimental-features = [
-      "nix-command"
-      "flakes"
-    ];
-    trusted-users = [
-      "root"
-      "@wheel"
-    ];
-    # Pull aarch64 builds from the community cache
-    substituters = [
-      "https://cache.nixos.org"
-      "https://nix-community.cachix.org"
-    ];
-    trusted-public-keys = [
-      "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
-      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Bg="
-    ];
-  };
+  # `networking.hostName` is set from `host.hostname` above, and
+  # NetworkManager is enabled by `nix-config`'s networking capability.
+  networking.useDHCP = lib.mkDefault true;
 
   # ------------------------------------------------------------------ #
   # Base packages                                                        #
   # ------------------------------------------------------------------ #
+  # Deliberately just enough to debug the box over SSH, since none of
+  # `nix-config`'s program sets are enabled above.
   environment.systemPackages = with pkgs; [
     git
     vim
@@ -120,5 +96,13 @@
     wget
   ];
 
-  system.stateVersion = "25.05";
+  # ------------------------------------------------------------------ #
+  # State version                                                        #
+  # ------------------------------------------------------------------ #
+  # `nix-config` pins `system.stateVersion` to the release it currently tracks,
+  # which is right for a host installed on that release and wrong for this one:
+  # dubai was installed on 25.05, and stateVersion describes the state on disk,
+  # not the nixpkgs being built against. It must not move for the life of the
+  # install, so override it back.
+  system.stateVersion = lib.mkForce "25.05";
 }
