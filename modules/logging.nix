@@ -41,7 +41,22 @@
   # more than the log alone -- the secrets and the sqlite database live there
   # too. Alloy is the only member being added, and it only opens the path named
   # above, but it is a real widening rather than a free one.
+  # StateDirectoryMode alone does not do this. systemd applies it when it
+  # *creates* the directory and leaves an existing one alone, and this one was
+  # created at 0700 long ago -- after deploying the mode was still 0700 and
+  # alloy still could not traverse it. The tmpfiles rule is what actually
+  # enforces the mode, on every boot and every switch. Both are kept: the
+  # tmpfiles rule for the directory that exists, StateDirectoryMode so a fresh
+  # install starts correct rather than being corrected a moment later.
   systemd.services.home-assistant.serviceConfig.StateDirectoryMode = lib.mkForce "0750";
+
+  systemd.tmpfiles.rules = [
+    "d /var/lib/hass 0750 hass hass -"
+    # Home assistant recreates this on each start with whatever the service
+    # umask gives it. 0640 is group-readable either way and drops the world
+    # read that 0644 would otherwise leave on a file full of addresses.
+    "z /var/lib/hass/home-assistant.log 0640 hass hass -"
+  ];
 
   systemd.services.alloy.serviceConfig.SupplementaryGroups = [ "hass" ];
 }
