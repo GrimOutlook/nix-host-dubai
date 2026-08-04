@@ -39,6 +39,14 @@
     nix-index-database.enable = false;
     # Desktop file/MIME associations; nothing headless uses them.
     xdg.enable = false;
+
+    # dubai is wifi-only in practice (`end0` has no cable), and Home Assistant
+    # is ordered `After=network-online.target`. Without this, that target is
+    # reached as soon as NetworkManager has finished starting -- before the
+    # association and DHCP lease land -- and hass starts with no IPv4 address,
+    # which kills `zeroconf` and everything downstream of it for the life of
+    # the process. See `wifi/default.nix` for the profile itself.
+    networking.waitOnline = true;
   };
 
   # ------------------------------------------------------------------ #

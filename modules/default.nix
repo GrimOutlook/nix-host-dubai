@@ -3,5 +3,6 @@
     ./configurations.nix
     ./disko.nix
     ./home-assistant
+    ./wifi
   ];
 }
