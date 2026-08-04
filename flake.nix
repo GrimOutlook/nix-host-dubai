@@ -66,8 +66,65 @@
         };
       });
 
-      # Build the SD card image with:
-      # nix build .#sdImages.dubai
-      sdImages.dubai = self.nixosConfigurations.dubai.config.system.build.sdImage;
+      # A bootable rescue/installer card for this Pi.
+      #
+      # There is deliberately no image of `dubai` itself: its root lives on the
+      # NVMe (see `modules/disko.nix`), so an SD image of that config would have
+      # to define its own conflicting `fileSystems."/"`. The supported route is
+      # to boot this installer and install onto the NVMe from it.
+      #
+      #   nix build .#installerImage
+      #
+      # This is upstream's rpi5 installer plus the workstation SSH keys, so it
+      # can be driven over the network instead of needing a keyboard on the Pi.
+      # See README.md for the install procedure.
+      nixosConfigurations.dubai-installer = nixos-raspberrypi.lib.nixosInstaller {
+        specialArgs = { inherit inputs; };
+        modules = [
+          (
+            {
+              pkgs,
+              nixos-raspberrypi,
+              ...
+            }:
+            {
+              imports = with nixos-raspberrypi.nixosModules; [
+                raspberry-pi-5.base
+              ];
+
+              networking.hostName = "dubai-installer";
+
+              # Same keys the retired `pi` account carried, so the machines that
+              # deploy dubai can reach the installer too. The installation-device
+              # profile already enables sshd and a passwordless `nixos` user.
+              users.users =
+                let
+                  keys = [
+                    # paris
+                    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA+VOouatDdN2oqpwfDtzJqDvrx9YJwbvs3of1aZ8Q24"
+                    # berlin
+                    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIApGjkXLSbpQIvpIFbVeywyS8Y9rk0kQqPT5wjE/QEnX"
+                  ];
+                in
+                {
+                  nixos.openssh.authorizedKeys.keys = keys;
+                  root.openssh.authorizedKeys.keys = keys;
+                };
+
+              # Enough to partition the NVMe and fetch this flake on the Pi.
+              environment.systemPackages = with pkgs; [
+                disko
+                git
+              ];
+
+              # Throwaway media -- nothing persists across boots of it, so this
+              # just tracks whatever release the image is built from.
+              system.stateVersion = "26.05";
+            }
+          )
+        ];
+      };
+
+      installerImage = self.nixosConfigurations.dubai-installer.config.system.build.sdImage;
     };
 }

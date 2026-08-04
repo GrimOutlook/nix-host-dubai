@@ -47,6 +47,22 @@
   # kernelboot is the default for Pi 5 and supports generation rollbacks
   boot.loader.raspberry-pi.bootloader = "kernel";
 
+  # 26.05 defaults `boot.initrd.systemd.enable` to true. This Pi has only ever
+  # booted the scripted stage-1, and the switch to a systemd initrd is the one
+  # boot-path change in the 25.05 -> 26.05 move (it also adds `root=fstab` to
+  # the cmdline) -- everything else, `fileSystems` included, is byte-identical.
+  # A systemd initrd is also materially larger, which matters here: the Pi
+  # firmware loads the initrd into memory, and nixos-raspberrypi's own
+  # installer force-disables swraid precisely because an oversized initrd fails
+  # with "/initrd.image: incomplete write (-28 ...)" and does not boot. On top
+  # of that, `boot.loader.raspberry-pi` keeps `configurationLimit = 4`
+  # generations as full copies of kernel+initrd+dtbs on a 512M `/boot/firmware`,
+  # so a bigger initrd eats that budget four times over.
+  #
+  # Keep the initrd that was known to boot. Revisit only with a serial console
+  # attached and a way to roll back (`os_prefix=` in `config.txt`).
+  boot.initrd.systemd.enable = false;
+
   # ------------------------------------------------------------------ #
   # Hardware                                                             #
   # ------------------------------------------------------------------ #
