@@ -82,6 +82,24 @@
       # Includes dependencies for a basic setup
       # https://www.home-assistant.io/integrations/default_config/
       default_config = { };
+      # `lovelaceConfig` above only registers the Home view as an *extra*
+      # sidebar dashboard (services.home-assistant.config.lovelace.dashboards.nixos-lovelace)
+      # -- it does NOT replace HA's built-in default/primary dashboard, which
+      # stays in storage mode and is what actually loads first. The built-in
+      # primary dashboard's reserved url_path is "lovelace" -- defining a
+      # `dashboards.lovelace` entry (as opposed to any other name) reconfigures
+      # that primary dashboard itself rather than adding another sidebar
+      # entry, making the Home view the initial page. (The legacy top-level
+      # `lovelace.mode` does the same thing but is deprecated as of HA
+      # 2026.8.) The module-generated `dashboards.nixos-lovelace` entry is
+      # nulled out so it doesn't linger as a redundant second sidebar item.
+      lovelace.dashboards = {
+        nixos-lovelace = null;
+        lovelace = {
+          mode = "yaml";
+          filename = "ui-lovelace.yaml";
+        };
+      };
       # Requests are reverse-proxied by caddy on newyork before reaching
       # this host, so Home Assistant needs to trust it to honor the
       # X-Forwarded-* headers it sets. Without this, external access
