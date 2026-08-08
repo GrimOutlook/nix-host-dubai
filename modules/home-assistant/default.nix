@@ -70,6 +70,19 @@
             }
           ];
         }
+        {
+          title = "Cameras";
+          path = "cameras";
+          icon = "mdi:cctv";
+          cards = [
+            {
+              type = "picture-entity";
+              title = "Driveway";
+              entity = "camera.driveway";
+              camera_view = "live";
+            }
+          ];
+        }
       ];
     };
     config = {
