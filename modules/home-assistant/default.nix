@@ -48,9 +48,9 @@
       title = "Longleaf";
       views = [
         {
-          title = "Weather";
-          path = "weather";
-          icon = "mdi:weather-lightning";
+          title = "Home";
+          path = "home";
+          icon = "mdi:home";
           cards = [
             {
               type = "markdown";
@@ -68,13 +68,6 @@
                 {% endif %}
               '';
             }
-          ];
-        }
-        {
-          title = "Cameras";
-          path = "cameras";
-          icon = "mdi:cctv";
-          cards = [
             {
               type = "picture-entity";
               title = "Driveway";
