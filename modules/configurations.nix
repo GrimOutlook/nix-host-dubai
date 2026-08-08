@@ -55,6 +55,12 @@
   # kernelboot is the default for Pi 5 and supports generation rollbacks
   boot.loader.raspberry-pi.bootloader = "kernel";
 
+  # `nix-config`'s core capability and `nixos-raspberrypi`'s `raspberry-pi-5.base`
+  # both set `boot.kernelPackages` with `mkDefault`, so at equal priority the
+  # module system can't pick a winner. Force the vendor kernel explicitly --
+  # it's the only one with the Pi 5 device tree/overlay support this board needs.
+  boot.kernelPackages = lib.mkForce nixos-raspberrypi.packages.${pkgs.stdenv.hostPlatform.system}.linuxPackages_rpi5;
+
   # 26.05 defaults `boot.initrd.systemd.enable` to true. This Pi has only ever
   # booted the scripted stage-1, and the switch to a systemd initrd is the one
   # boot-path change in the 25.05 -> 26.05 move (it also adds `root=fstab` to
