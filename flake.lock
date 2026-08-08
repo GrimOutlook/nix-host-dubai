@@ -484,11 +484,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1786163620,
-        "narHash": "sha256-bUhI9EvU+f02WOUfsixChlnupevUCNGOwJdd4dMY0B4=",
+        "lastModified": 1786165889,
+        "narHash": "sha256-uxw3zW1sWbBmy0ax0iQ9dPQv7dpe73XfJFxq6Ftl6EA=",
         "ref": "refs/heads/main",
-        "rev": "8764736b3901810a9beb240b28871bdbeda5cc18",
-        "revCount": 88,
+        "rev": "1c14ac5b9cecc73388748dfd39bd94d27133f8a0",
+        "revCount": 89,
         "type": "git",
         "url": "ssh://git@github.com/GrimOutlook/nix-homelab"
       },
