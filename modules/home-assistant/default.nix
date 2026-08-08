@@ -53,6 +53,12 @@
           icon = "mdi:home";
           cards = [
             {
+              type = "picture-entity";
+              title = "Driveway";
+              entity = "camera.driveway";
+              camera_view = "live";
+            }
+            {
               type = "markdown";
               title = "Active Weather Hazards";
               content = ''
@@ -67,12 +73,6 @@
                 {% endfor %}
                 {% endif %}
               '';
-            }
-            {
-              type = "picture-entity";
-              title = "Driveway";
-              entity = "camera.driveway";
-              camera_view = "live";
             }
           ];
         }
@@ -178,49 +178,52 @@
       # and stops working in HA 2026.6.
       template = [
         {
-          binary_sensor = map (
-            {
-              id,
-              friendlyName,
-              event,
-            }:
-            {
-              name = friendlyName;
-              default_entity_id = "binary_sensor.${id}";
-              device_class = "safety";
-              # One sensor per NWS alert `event` string we care about --
-              # https://api.weather.gov/alerts/active?point=... entries carry
-              # exactly this name in properties.event.
-              state = ''
-                {{ state_attr('sensor.nws_active_alerts', 'features')
-                   | default([])
-                   | selectattr('properties.event', 'equalto', '${event}')
-                   | list | count > 0 }}
-              '';
-              availability = "{{ states('sensor.nws_active_alerts') not in ['unknown', 'unavailable'] }}";
-            }
-          ) [
-            {
-              id = "tornado_warning";
-              friendlyName = "Tornado Warning";
-              event = "Tornado Warning";
-            }
-            {
-              id = "tornado_watch";
-              friendlyName = "Tornado Watch";
-              event = "Tornado Watch";
-            }
-            {
-              id = "severe_thunderstorm_warning";
-              friendlyName = "Severe Thunderstorm Warning";
-              event = "Severe Thunderstorm Warning";
-            }
-            {
-              id = "severe_thunderstorm_watch";
-              friendlyName = "Severe Thunderstorm Watch";
-              event = "Severe Thunderstorm Watch";
-            }
-          ];
+          binary_sensor =
+            map
+              (
+                {
+                  id,
+                  friendlyName,
+                  event,
+                }:
+                {
+                  name = friendlyName;
+                  default_entity_id = "binary_sensor.${id}";
+                  device_class = "safety";
+                  # One sensor per NWS alert `event` string we care about --
+                  # https://api.weather.gov/alerts/active?point=... entries carry
+                  # exactly this name in properties.event.
+                  state = ''
+                    {{ state_attr('sensor.nws_active_alerts', 'features')
+                       | default([])
+                       | selectattr('properties.event', 'equalto', '${event}')
+                       | list | count > 0 }}
+                  '';
+                  availability = "{{ states('sensor.nws_active_alerts') not in ['unknown', 'unavailable'] }}";
+                }
+              )
+              [
+                {
+                  id = "tornado_warning";
+                  friendlyName = "Tornado Warning";
+                  event = "Tornado Warning";
+                }
+                {
+                  id = "tornado_watch";
+                  friendlyName = "Tornado Watch";
+                  event = "Tornado Watch";
+                }
+                {
+                  id = "severe_thunderstorm_warning";
+                  friendlyName = "Severe Thunderstorm Warning";
+                  event = "Severe Thunderstorm Warning";
+                }
+                {
+                  id = "severe_thunderstorm_watch";
+                  friendlyName = "Severe Thunderstorm Watch";
+                  event = "Severe Thunderstorm Watch";
+                }
+              ];
         }
       ];
       automation = [
