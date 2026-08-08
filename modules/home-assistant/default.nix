@@ -88,6 +88,83 @@
           };
         }
       ];
+      "sensor" = [
+        {
+          # National Weather Service active-alerts feed for the house's
+          # coordinates. NWS asks for an identifying User-Agent on every
+          # request (no API key needed) -- an empty/generic one gets rate
+          # limited or blocked, so this is the address recommended in their
+          # docs (any contact string works, it's just for their abuse
+          # reports).
+          platform = "rest";
+          name = "NWS Active Alerts";
+          resource = "https://api.weather.gov/alerts/active?point=34.7608002429598,-86.69216641164486";
+          method = "GET";
+          headers = {
+            User-Agent = "Home Assistant (dominic.j.grimaldi@gmail.com)";
+            Accept = "application/geo+json";
+          };
+          # Value is just a count; the binary_sensor below re-parses the
+          # attribute for the actual event names.
+          value_template = "{{ value_json.features | length }}";
+          json_attributes = [ "features" ];
+          scan_interval = 60;
+        }
+      ];
+      "binary_sensor" = [
+        {
+          platform = "template";
+          # One sensor per NWS alert `event` string we care about --
+          # https://api.weather.gov/alerts/active?point=... entries carry
+          # exactly this name in properties.event.
+          sensors = lib.listToAttrs (
+            map
+              (
+                {
+                  id,
+                  friendlyName,
+                  event,
+                }:
+                {
+                  name = id;
+                  value = {
+                    friendly_name = friendlyName;
+                    device_class = "safety";
+                    value_template = ''
+                      {{ state_attr('sensor.nws_active_alerts', 'features')
+                         | default([])
+                         | selectattr('properties.event', 'equalto', '${event}')
+                         | list | count > 0 }}
+                    '';
+                    availability_template = "{{ states('sensor.nws_active_alerts') not in ['unknown', 'unavailable'] }}";
+                  };
+                }
+              )
+              [
+                {
+                  id = "tornado_warning";
+                  friendlyName = "Tornado Warning";
+                  event = "Tornado Warning";
+                }
+                {
+                  id = "tornado_watch";
+                  friendlyName = "Tornado Watch";
+                  event = "Tornado Watch";
+                }
+                {
+                  id = "severe_thunderstorm_warning";
+                  friendlyName = "Severe Thunderstorm Warning";
+                  event = "Severe Thunderstorm Warning";
+                }
+                {
+                  id = "severe_thunderstorm_watch";
+                  friendlyName = "Severe Thunderstorm Watch";
+                  event = "Severe Thunderstorm Watch";
+                }
+              ]
+          );
+        }
+      ];
       automation = [
         {
           alias = "Frigate alert notification";
