@@ -98,6 +98,12 @@
         lovelace = {
           mode = "yaml";
           filename = "ui-lovelace.yaml";
+          # `title` is required by the lovelace integration's config schema
+          # even for the primary dashboard -- omitting it fails validation,
+          # which cascades into `frontend` failing to load entirely and HA
+          # falling into recovery mode.
+          title = "Longleaf";
+          icon = "mdi:view-dashboard";
         };
       };
       # Requests are reverse-proxied by caddy on newyork before reaching
