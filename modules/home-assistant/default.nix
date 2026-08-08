@@ -40,6 +40,48 @@
       frigate
       gpio
     ];
+    # There was no UI-managed (storage-mode) dashboard on dubai to preserve
+    # when this was switched to YAML mode, so nothing was migrated -- this
+    # replaces the auto-generated default dashboard outright. Setting
+    # lovelaceConfig implicitly puts the main panel in `yaml` mode, which
+    # means it's no longer editable from the HA UI; change it here instead.
+    lovelaceConfig = {
+      title = "Longleaf";
+      views = [
+        {
+          # `original-states` reproduces HA's auto-generated dashboard (one
+          # card per area/entity), so switching to YAML mode doesn't lose
+          # the default "everything" view.
+          title = "Home";
+          path = "home";
+          icon = "mdi:home";
+          strategy.type = "original-states";
+        }
+        {
+          title = "Weather";
+          path = "weather";
+          icon = "mdi:weather-lightning";
+          cards = [
+            {
+              type = "markdown";
+              title = "Active Weather Hazards";
+              content = ''
+                {% set alerts = state_attr('sensor.nws_active_alerts', 'features') | default([]) %}
+                {% if alerts | count == 0 %}
+                ✅ No active weather hazards.
+                {% else %}
+                {% for a in alerts %}
+                **{{ a.properties.event }}**
+                {{ a.properties.headline }}
+
+                {% endfor %}
+                {% endif %}
+              '';
+            }
+          ];
+        }
+      ];
+    };
     config = {
       # Includes dependencies for a basic setup
       # https://www.home-assistant.io/integrations/default_config/
