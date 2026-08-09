@@ -76,12 +76,19 @@
             }
             {
               type = "iframe";
-              title = "Radar";
               aspect_ratio = "75%";
               # https://embed.windy.com -- Windy's public embeddable widget,
               # centered on the house's coordinates with the radar overlay.
               # `marker=true` drops a pin at detailLat/detailLon (the house).
               url = "https://embed.windy.com/embed2.html?lat=34.7608002429598&lon=-86.69216641164486&detailLat=34.7608002429598&detailLon=-86.69216641164486&width=650&height=450&zoom=8&level=surface&overlay=radar&product=radar&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1";
+            }
+            {
+              type = "entities";
+              title = "House Internet Usage";
+              entities = [
+                "sensor.wan_download_speed"
+                "sensor.wan_upload_speed"
+              ];
             }
           ];
         }
@@ -181,7 +188,45 @@
           json_attributes = [ "features" ];
           scan_interval = 60;
         }
-      ];
+      ]
+      # WAN upload/download throughput, read straight from newyork's own
+      # Prometheus (hosts/newyork/modules/services/prometheus.nix) rather than
+      # adding a second exporter path -- node_exporter there already scrapes
+      # eth1 (the WAN NIC, see hosts/newyork/modules/default.nix's `iface`).
+      # `rate(...)[5m]` (not 1m) because Prometheus's scrape_interval here is
+      # the module default of 1m; a 1m rate window can span too few samples
+      # and intermittently return no data.
+      ++ map
+        (
+          {
+            name,
+            device,
+          }:
+          {
+            platform = "rest";
+            inherit name;
+            resource = "http://newyork.${homelab.domains.local}:${
+              toString homelab.hosts.newyork.services.prometheus.ports.web.number
+            }/api/v1/query";
+            method = "GET";
+            params.query = "rate(node_network_${device}_bytes_total{host=\"newyork\",device=\"eth1\"}[5m]) * 8 / 1000000";
+            value_template = "{{ (value_json.data.result[0].value[1] | float(0)) | round(2) }}";
+            unit_of_measurement = "Mbit/s";
+            device_class = "data_rate";
+            state_class = "measurement";
+            scan_interval = 15;
+          }
+        )
+        [
+          {
+            name = "WAN Download Speed";
+            device = "receive";
+          }
+          {
+            name = "WAN Upload Speed";
+            device = "transmit";
+          }
+        ];
       # Modern `template:` integration syntax -- the legacy
       # `binary_sensor: [{ platform = "template"; ... }]` form is deprecated
       # and stops working in HA 2026.6.
