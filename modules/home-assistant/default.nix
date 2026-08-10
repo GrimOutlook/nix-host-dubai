@@ -40,6 +40,12 @@
       frigate
       gpio
     ];
+    # card-mod lets the Windy iframe's `ha-card` wrapper be styled directly --
+    # used below to disable pointer-events so the embedded map can't be
+    # dragged/panned (Windy's embed2 iframe has no URL param for this).
+    customLovelaceModules = with pkgs.home-assistant-custom-lovelace-modules; [
+      card-mod
+    ];
     # There was no UI-managed (storage-mode) dashboard on dubai to preserve
     # when this was switched to YAML mode, so nothing was migrated. Setting
     # lovelaceConfig implicitly puts the main panel in `yaml` mode, which
@@ -80,7 +86,15 @@
               # https://embed.windy.com -- Windy's public embeddable widget,
               # centered on the house's coordinates with the radar overlay.
               # `marker=true` drops a pin at detailLat/detailLon (the house).
-              url = "https://embed.windy.com/embed2.html?lat=34.7608002429598&lon=-86.69216641164486&detailLat=34.7608002429598&detailLon=-86.69216641164486&width=650&height=450&zoom=8&level=surface&overlay=radar&product=radar&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1";
+              url = "https://embed.windy.com/embed2.html?lat=34.7608002429598&lon=-86.69216641164486&detailLat=34.7608002429598&detailLon=-86.69216641164486&width=650&height=450&zoom=8&level=surface&overlay=radar&product=radar&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&metricRain=in&radarRange=-1";
+              # Windy's embed2 iframe has no URL param to disable dragging, so
+              # this blocks all pointer interaction with the card instead --
+              # the map still animates/updates, it just can't be panned/zoomed.
+              card_mod.style = ''
+                ha-card {
+                  pointer-events: none;
+                }
+              '';
             }
             {
               type = "entities";
