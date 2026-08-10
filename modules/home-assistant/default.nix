@@ -65,6 +65,15 @@
               camera_view = "live";
             }
             {
+              # `met` (extraComponents above) was set up during onboarding
+              # and registered itself as this entity_id -- confirmed via
+              # /var/lib/hass/.storage/core.entity_registry on the live host,
+              # since `met` is config-flow-only (no YAML entity config).
+              type = "weather-forecast";
+              entity = "weather.forecast_home";
+              forecast_type = "daily";
+            }
+            {
               type = "markdown";
               title = "Active Weather Hazards";
               content = ''
