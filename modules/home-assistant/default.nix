@@ -59,35 +59,59 @@
           icon = "mdi:home";
           cards = [
             {
-              type = "picture-entity";
-              title = "Driveway";
-              entity = "camera.driveway";
-              camera_view = "live";
+              type = "vertical-stack";
+              cards = [
+                {
+                  type = "picture-entity";
+                  title = "Driveway";
+                  entity = "camera.driveway";
+                  camera_view = "live";
+                }
+                {
+                  type = "entities";
+                  title = "House Internet Usage";
+                  entities = [
+                    "sensor.wan_download_speed"
+                    "sensor.wan_upload_speed"
+                  ];
+                }
+              ];
             }
             {
-              # `met` (extraComponents above) was set up during onboarding
-              # and registered itself as this entity_id -- confirmed via
-              # /var/lib/hass/.storage/core.entity_registry on the live host,
-              # since `met` is config-flow-only (no YAML entity config).
-              type = "weather-forecast";
-              entity = "weather.forecast_home";
-              forecast_type = "daily";
-            }
-            {
-              type = "markdown";
-              title = "Active Weather Hazards";
-              content = ''
-                {% set alerts = state_attr('sensor.nws_active_alerts', 'features') | default([]) %}
-                {% if alerts | count == 0 %}
-                ✅ No active weather hazards.
-                {% else %}
-                {% for a in alerts %}
-                **{{ a.properties.event }}**
-                {{ a.properties.headline }}
+              type = "vertical-stack";
+              cards = [
+                {
+                  # `met` (extraComponents above) was set up during
+                  # onboarding and registered itself as this entity_id --
+                  # confirmed via /var/lib/hass/.storage/core.entity_registry
+                  # on the live host, since `met` is config-flow-only (no
+                  # YAML entity config).
+                  type = "weather-forecast";
+                  entity = "weather.forecast_home";
+                  forecast_type = "daily";
+                }
+                {
+                  type = "horizontal-stack";
+                  cards = [
+                    {
+                      type = "markdown";
+                      title = "Active Weather Hazards";
+                      content = ''
+                        {% set alerts = state_attr('sensor.nws_active_alerts', 'features') | default([]) %}
+                        {% if alerts | count == 0 %}
+                        ✅ No active weather hazards.
+                        {% else %}
+                        {% for a in alerts %}
+                        **{{ a.properties.event }}**
+                        {{ a.properties.headline }}
 
-                {% endfor %}
-                {% endif %}
-              '';
+                        {% endfor %}
+                        {% endif %}
+                      '';
+                    }
+                  ];
+                }
+              ];
             }
             {
               type = "iframe";
@@ -105,13 +129,30 @@
                 }
               '';
             }
+          ];
+        }
+        {
+          title = "Cameras";
+          path = "cameras";
+          icon = "mdi:cctv";
+          cards = [
             {
-              type = "entities";
-              title = "House Internet Usage";
-              entities = [
-                "sensor.wan_download_speed"
-                "sensor.wan_upload_speed"
-              ];
+              type = "picture-entity";
+              title = "Driveway";
+              entity = "camera.driveway";
+              camera_view = "live";
+            }
+            {
+              type = "picture-entity";
+              title = "Front Door";
+              entity = "camera.front_door";
+              camera_view = "live";
+            }
+            {
+              type = "picture-entity";
+              title = "Back Gate";
+              entity = "camera.back_gate";
+              camera_view = "live";
             }
           ];
         }
@@ -219,37 +260,36 @@
       # `rate(...)[5m]` (not 1m) because Prometheus's scrape_interval here is
       # the module default of 1m; a 1m rate window can span too few samples
       # and intermittently return no data.
-      ++ map
-        (
-          {
-            name,
-            device,
-          }:
-          {
-            platform = "rest";
-            inherit name;
-            resource = "http://newyork.${homelab.domains.local}:${
-              toString homelab.hosts.newyork.services.prometheus.ports.web.number
-            }/api/v1/query";
-            method = "GET";
-            params.query = "rate(node_network_${device}_bytes_total{host=\"newyork\",device=\"eth1\"}[5m]) * 8 / 1000000";
-            value_template = "{{ (value_json.data.result[0].value[1] | float(0)) | round(2) }}";
-            unit_of_measurement = "Mbit/s";
-            device_class = "data_rate";
-            state_class = "measurement";
-            scan_interval = 15;
-          }
-        )
-        [
-          {
-            name = "WAN Download Speed";
-            device = "receive";
-          }
-          {
-            name = "WAN Upload Speed";
-            device = "transmit";
-          }
-        ];
+      ++
+        map
+          (
+            {
+              name,
+              device,
+            }:
+            {
+              platform = "rest";
+              inherit name;
+              resource = "http://newyork.${homelab.domains.local}:${toString homelab.hosts.newyork.services.prometheus.ports.web.number}/api/v1/query";
+              method = "GET";
+              params.query = "rate(node_network_${device}_bytes_total{host=\"newyork\",device=\"eth1\"}[5m]) * 8 / 1000000";
+              value_template = "{{ (value_json.data.result[0].value[1] | float(0)) | round(2) }}";
+              unit_of_measurement = "Mbit/s";
+              device_class = "data_rate";
+              state_class = "measurement";
+              scan_interval = 15;
+            }
+          )
+          [
+            {
+              name = "WAN Download Speed";
+              device = "receive";
+            }
+            {
+              name = "WAN Upload Speed";
+              device = "transmit";
+            }
+          ];
       # Modern `template:` integration syntax -- the legacy
       # `binary_sensor: [{ platform = "template"; ... }]` form is deprecated
       # and stops working in HA 2026.6.
