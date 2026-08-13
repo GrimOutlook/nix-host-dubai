@@ -61,9 +61,26 @@
                 # period forecast feed. Replaced weather.forecast_home (the `met`
                 # integration that self-registered during onboarding) as
                 # the data source; `met` is still installed but unused.
-                type = "weather-forecast";
+                #
+                # Uses the custom weather-forecast-card (see weatherForecastCard
+                # in default.nix) instead of the stock weather-forecast card --
+                # its chart mode can plot apparent_temperature (feels-like) as
+                # its own forecast line via the attribute-selector gear icon,
+                # which neither the stock card nor weather-chart-card support.
+                # weather.nws only implements the hourly/twice_daily forecast
+                # types (see weather.nix), not daily, so forecast_types is
+                # pinned to hourly to avoid an empty daily toggle.
+                type = "custom:weather-forecast-card";
                 entity = "weather.nws";
-                forecast_type = "hourly";
+                default_forecast = "hourly";
+                forecast_types = "hourly";
+                current = {
+                  show_attributes = [ "apparent_temperature" ];
+                };
+                forecast = {
+                  mode = "chart";
+                  show_attribute_selector = true;
+                };
               }
               {
                 type = "horizontal-stack";

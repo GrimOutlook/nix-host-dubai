@@ -10,6 +10,29 @@ let
   lovelaceModule = import ./lovelace.nix { };
   wanConfig = import ./wan.nix { inherit homelab; };
   automationsConfig = import ./automations.nix { };
+  # Not packaged in nixpkgs (unlike the cards under
+  # pkgs.home-assistant-custom-lovelace-modules below), so it's fetched
+  # directly here -- upstream publishes a single prebuilt JS bundle per
+  # GitHub release, which is simpler and just as reproducible as a
+  # source build for a one-file lovelace card.
+  weatherForecastCard = pkgs.stdenvNoCC.mkDerivation rec {
+    pname = "weather-forecast-card";
+    version = "1.1.0";
+    src = pkgs.fetchurl {
+      url = "https://github.com/troinine/ha-weather-forecast-card/releases/download/v${version}/weather-forecast-card.js";
+      hash = "sha256-a++9rfQFeH2rWdix6JBhQpraseSS89Rgn5LyboeGjJQ=";
+    };
+    dontUnpack = true;
+    installPhase = ''
+      mkdir -p $out
+      cp $src $out/${pname}.js
+    '';
+    meta = {
+      description = "Weather forecast card for Home Assistant with hourly/daily toggle and trend charts";
+      homepage = "https://github.com/troinine/ha-weather-forecast-card";
+      license = lib.licenses.mit;
+    };
+  };
 in
 {
   # Shared credential for the MQTT broker hosted on newyork (see nix-homelab).
@@ -50,9 +73,13 @@ in
     # card-mod lets the Windy iframe's `ha-card` wrapper be styled directly --
     # used in lovelace.nix to disable pointer-events so the embedded map can't be
     # dragged/panned (Windy's embed2 iframe has no URL param for this).
+    # weather-forecast-card (see weatherForecastCard above) renders weather.nws
+    # -- its chart mode can plot apparent_temperature (feels-like) as its own
+    # forecast line, which the previously-used stock weather-forecast card and
+    # weather-chart-card can't do at all.
     customLovelaceModules = with pkgs.home-assistant-custom-lovelace-modules; [
       card-mod
-    ];
+    ] ++ [ weatherForecastCard ];
 
     lovelaceConfig = lovelaceModule.lovelaceConfig;
 
