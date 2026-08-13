@@ -246,6 +246,52 @@ let
         device_class = "timestamp";
         entity_category = "diagnostic";
       }
+      {
+        # Catch-all for ATTR_GET_SERVICE/DEVICE_PROPERTIES_SERVICE responses
+        # (both land on service/post, the "post" counterpart of the
+        # service/sub commands below) -- unlike event/post's fixed set of
+        # event kinds, these two return whatever fields the firmware
+        # decides to report, which isn't practical to pick apart field by
+        # field in Nix. State is just the ack code; the full response body
+        # is in the state attribute.
+        name = "Last Service Response";
+        unique_id = "${deviceId}_last_service_response";
+        device = feederDevice { inherit name deviceId; };
+        state_topic = feederTopic deviceId "service/post";
+        value_template = "{{ value_json.code | default('unknown') }}";
+        json_attributes_topic = feederTopic deviceId "service/post";
+        json_attributes_template = "{{ value_json }}";
+        icon = "mdi:message-reply-text";
+        entity_category = "diagnostic";
+      }
+      {
+        # Response to TRIGGER_DEVICE_LOG_REPORT_SERVICE (button below) --
+        # DEVICE_LOG_REPORT_EVENT on event/post, structured diagnostic data
+        # (DNS servers, connection latency per FINDINGS.md). Same
+        # whole-payload-as-attributes approach as Last Service Response
+        # above, for the same reason (undocumented field set).
+        name = "Last Diagnostic Log";
+        unique_id = "${deviceId}_last_diagnostic_log";
+        device = feederDevice { inherit name deviceId; };
+        state_topic = feederTopic deviceId "event/post";
+        value_template = ''
+          {%- if value_json.cmd == 'DEVICE_LOG_REPORT_EVENT' -%}
+            {{- now().isoformat() -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        json_attributes_topic = feederTopic deviceId "event/post";
+        json_attributes_template = ''
+          {%- if value_json.cmd == 'DEVICE_LOG_REPORT_EVENT' -%}
+            {{- value_json -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        device_class = "timestamp";
+        entity_category = "diagnostic";
+      }
     ];
   feederCovers =
     { name, deviceId }:
@@ -282,8 +328,183 @@ let
         device_class = "door";
       }
     ];
+  # Text/number/time helpers that exist purely so a button can read a
+  # value at press time -- MQTT button/select/switch/number entities can
+  # each only publish their own single fixed-shape payload, so anything
+  # needing more than one field (RFID add, WiFi change, the feeding
+  # schedule) has to pull its extra fields from a paired helper the same
+  # way Feed Now already does for grainNum.
+  feederTextHelpers =
+    { name, deviceId }:
+    let
+      key = feederKey name;
+    in
+    [
+      (lib.nameValuePair "${key}_rfid_member_id" {
+        name = "${name} RFID Member ID";
+        icon = "mdi:identifier";
+      })
+      (lib.nameValuePair "${key}_rfid_calibration_tag" {
+        name = "${name} RFID Calibration Tag";
+        icon = "mdi:tag";
+      })
+      # 7-char Mon-Sun bitmask ("1111111" = every day) -- a text field
+      # matching DEVICE_FEEDING_PLAN_SERVICE's own wire format directly is
+      # simpler than building seven separate day-toggle helpers for one
+      # rarely-changed setting.
+      (lib.nameValuePair "${key}_schedule_repeat_days" {
+        name = "${name} Schedule Repeat Days";
+        icon = "mdi:calendar-week";
+        pattern = "^[01]{7}$";
+      })
+      (lib.nameValuePair "${key}_wifi_ssid" {
+        name = "${name} WiFi SSID (caution)";
+        icon = "mdi:wifi";
+      })
+      (lib.nameValuePair "${key}_wifi_password" {
+        name = "${name} WiFi Password (caution)";
+        mode = "password";
+        icon = "mdi:wifi-lock";
+      })
+    ];
+  feederNumberHelpers =
+    { name, deviceId }:
+    let
+      key = feederKey name;
+    in
+    [
+      (lib.nameValuePair "${key}_feed_amount" {
+        name = "${name} Feed Amount";
+        min = 1;
+        max = 10;
+        step = 1;
+        initial = 1;
+        icon = "mdi:bowl-mix";
+        unit_of_measurement = "portions";
+      })
+      (lib.nameValuePair "${key}_schedule_grain_amount" {
+        name = "${name} Schedule Grain Amount";
+        min = 1;
+        max = 10;
+        step = 1;
+        initial = 1;
+        icon = "mdi:bowl-mix";
+        unit_of_measurement = "portions";
+      })
+    ];
+  feederTimeHelpers =
+    { name, deviceId }:
+    [
+      (lib.nameValuePair "${feederKey name}_schedule_time" {
+        name = "${name} Schedule Time";
+        has_time = true;
+        has_date = false;
+      })
+    ];
+  # Individual on/off toggles for the handful of ATTR_SET_SERVICE fields
+  # (mqtt_command_reference.md's ~30-field bulk setter) that are actually
+  # meant for regular use, rather than one giant form for all of them --
+  # motor PWM duty cycles, stall-current thresholds, and the rest are
+  # calibration parameters, not user-facing settings, and aren't exposed
+  # here.
+  feederSwitches =
+    { name, deviceId }:
+    let
+      attrSwitch =
+        {
+          key,
+          label,
+          field,
+          icon,
+        }:
+        {
+          name = label;
+          unique_id = "${deviceId}_${key}";
+          device = feederDevice { inherit name deviceId; };
+          command_topic = feederTopic deviceId "service/sub";
+          payload_on = builtins.toJSON {
+            cmd = "ATTR_SET_SERVICE";
+            ${field} = 1;
+          };
+          payload_off = builtins.toJSON {
+            cmd = "ATTR_SET_SERVICE";
+            ${field} = 0;
+          };
+          # ATTR_SET_SERVICE's ack (Last Service Response) only confirms
+          # the write was received, not the new value, and ATTR_PUSH_EVENT
+          # bundles the device's *entire* config schema per push -- not
+          # worth parsing out one field from that just to avoid assuming
+          # the command we sent took effect.
+          optimistic = true;
+          inherit icon;
+        };
+    in
+    map attrSwitch [
+      {
+        key = "child_lock";
+        label = "Child Lock";
+        field = "childLockSwitch";
+        icon = "mdi:lock";
+      }
+      {
+        key = "sound";
+        label = "Sound";
+        field = "soundSwitch";
+        icon = "mdi:volume-high";
+      }
+      {
+        key = "disable_buttons";
+        label = "Disable Physical Buttons";
+        field = "disableHardwareButton";
+        icon = "mdi:gesture-tap-button";
+      }
+      {
+        key = "screen_display";
+        label = "Screen Display";
+        field = "enableScreenDisplay";
+        icon = "mdi:monitor";
+      }
+    ];
+  feederNumbers =
+    { name, deviceId }:
+    [
+      {
+        name = "Auto-Close Timer";
+        unique_id = "${deviceId}_close_door_time";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        command_template = "{{ {'cmd': 'ATTR_SET_SERVICE', 'closeDoorTimeSec': value | int} | tojson }}";
+        min = 0;
+        max = 120;
+        step = 1;
+        unit_of_measurement = "s";
+        optimistic = true;
+        icon = "mdi:timer-outline";
+      }
+    ];
+  feederSelects =
+    { name, deviceId }:
+    [
+      {
+        name = "Display Scene";
+        unique_id = "${deviceId}_display_scene";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        command_template = "{{ {'cmd': 'DISPLAY_MATRIX_SERVICE', 'displayScene': value} | tojson }}";
+        options = [
+          "PET_NAME"
+          "PRODUCT_TEST"
+          "DEFAULT_HELLO"
+        ];
+        optimistic = true;
+        icon = "mdi:image-text";
+      }
+    ];
   feederButtons =
     { name, deviceId }:
+    let
+      key = feederKey name;
+    in
     [
       {
         name = "Feed Now";
@@ -297,8 +518,156 @@ let
         # ever unknown/non-numeric (e.g. right after a HA restart, before
         # its state has been restored).
         payload_press = ''
-          {{ {'cmd': 'MANUAL_FEEDING_SERVICE', 'grainNum': states('input_number.${feederKey name}_feed_amount') | int(1)} | tojson }}
+          {{ {'cmd': 'MANUAL_FEEDING_SERVICE', 'grainNum': states('input_number.${key}_feed_amount') | int(1)} | tojson }}
         '';
+      }
+      {
+        name = "Set Feeding Schedule";
+        unique_id = "${deviceId}_feeding_plan";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        # channelPlanNum/planId/audioTimes aren't exposed as their own
+        # helpers -- one HA-managed plan slot with a fixed id and a
+        # reasonable default call-to-eat repeat count covers the normal
+        # "feed at this time, this much, on these days" case without
+        # needing three more input helpers per feeder.
+        payload_press = ''
+          {{ {
+            'cmd': 'DEVICE_FEEDING_PLAN_SERVICE',
+            'channelPlanNum': 1,
+            'planId': 'ha_plan',
+            'grainNum': states('input_number.${key}_schedule_grain_amount') | int(1),
+            'executionTime': states('input_datetime.${key}_schedule_time')[:5],
+            'repeatDay': states('input_text.${key}_schedule_repeat_days'),
+            'audioTimes': 2,
+            'syncTime': as_timestamp(now()) | int,
+          } | tojson }}
+        '';
+        icon = "mdi:calendar-clock";
+      }
+      {
+        name = "Refresh Settings";
+        unique_id = "${deviceId}_attr_get";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = builtins.toJSON { cmd = "ATTR_GET_SERVICE"; };
+        icon = "mdi:refresh";
+        entity_category = "diagnostic";
+      }
+      {
+        name = "Refresh Device Info";
+        unique_id = "${deviceId}_device_properties";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = builtins.toJSON { cmd = "DEVICE_PROPERTIES_SERVICE"; };
+        icon = "mdi:information-outline";
+        entity_category = "diagnostic";
+      }
+      {
+        name = "Start RFID Discovery";
+        unique_id = "${deviceId}_rfid_discovery_start";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = builtins.toJSON { cmd = "DISCOVERY_RFID_SERVICE"; };
+        icon = "mdi:card-search";
+      }
+      {
+        name = "Stop RFID Discovery";
+        unique_id = "${deviceId}_rfid_discovery_stop";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = builtins.toJSON { cmd = "DISCOVERY_STOP_SERVICE"; };
+        icon = "mdi:card-search-outline";
+      }
+      {
+        # Reads the two RFID input_text helpers (config.input_text below)
+        # at press time -- same live-template approach as Feed Now, for the
+        # same reason (a button can't take parameters of its own).
+        name = "Add/Update RFID Tag";
+        unique_id = "${deviceId}_rfid_add";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = ''
+          {{ {'cmd': 'ADD_OR_UPDATE_RFID_SERVICE', 'memberId': states('input_text.${key}_rfid_member_id'), 'calibrationTag': states('input_text.${key}_rfid_calibration_tag')} | tojson }}
+        '';
+        icon = "mdi:card-plus";
+      }
+      {
+        name = "Delete RFID Tag";
+        unique_id = "${deviceId}_rfid_delete";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = ''
+          {{ {'cmd': 'DEL_RFID_SERVICE', 'memberId': states('input_text.${key}_rfid_member_id')} | tojson }}
+        '';
+        icon = "mdi:card-remove";
+      }
+      {
+        name = "Unbind Pet";
+        unique_id = "${deviceId}_unbind_pet";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = ''
+          {{ {'cmd': 'UNBIND_PET_SERVICE', 'memberId': states('input_text.${key}_rfid_member_id')} | tojson }}
+        '';
+        icon = "mdi:account-off";
+      }
+      {
+        name = "Reconnect WiFi";
+        unique_id = "${deviceId}_wifi_reconnect";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = builtins.toJSON { cmd = "WIFI_RECONNECT_SERVICE"; };
+        icon = "mdi:wifi-refresh";
+        entity_category = "diagnostic";
+      }
+      {
+        # CAUTION (mqtt_command_reference.md): wrong credentials here can
+        # knock the device off the network entirely, with no remote way
+        # back short of re-provisioning it from scratch. Not disabled, but
+        # not made any easier to hit by accident than typing into the two
+        # WiFi input_text helpers above and then pressing this specific
+        # button.
+        name = "Change WiFi (Caution)";
+        unique_id = "${deviceId}_wifi_change";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = ''
+          {{ {'cmd': 'WIFI_CHANGE_SERVICE', 'wifiSsid': states('input_text.${key}_wifi_ssid'), 'wifiPassword': states('input_text.${key}_wifi_password')} | tojson }}
+        '';
+        icon = "mdi:alert-octagon";
+      }
+      {
+        name = "Run Self-Test";
+        unique_id = "${deviceId}_function_test";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = builtins.toJSON { cmd = "DEVICE_FUNCTION_TEST_SERVICE"; };
+        icon = "mdi:test-tube";
+        entity_category = "diagnostic";
+      }
+      {
+        name = "Request Diagnostic Log";
+        unique_id = "${deviceId}_log_report";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = builtins.toJSON { cmd = "TRIGGER_DEVICE_LOG_REPORT_SERVICE"; };
+        icon = "mdi:file-document-outline";
+        entity_category = "diagnostic";
+      }
+      {
+        # No documented on/off field -- mqtt_command_reference.md shows a
+        # bare {"cmd": "DEVICE_PRINT_LOG_SWITCH_SERVICE"} with no params at
+        # all, so this is modeled as a stateless toggle rather than a
+        # switch since there's no evidence it takes a specific target
+        # state.
+        name = "Toggle Debug Logging";
+        unique_id = "${deviceId}_print_log_switch";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_press = builtins.toJSON { cmd = "DEVICE_PRINT_LOG_SWITCH_SERVICE"; };
+        icon = "mdi:file-document-edit-outline";
+        entity_category = "diagnostic";
       }
     ];
   # House coordinates, shared by every NWS API call below (the alerts feed
@@ -571,24 +940,12 @@ in
         "sensor.nws_forecast"
         "sensor.nws_hourly_forecast"
       ];
-      # Paired with each feeder's "Feed Now" button (config.mqtt.button
-      # below) -- a plain local helper, not an MQTT entity itself, since
-      # there's nothing to report to or read from the device until the
-      # button is actually pressed.
-      input_number = lib.listToAttrs (
-        map (
-          f:
-          lib.nameValuePair "${feederKey f.name}_feed_amount" {
-            name = "${f.name} Feed Amount";
-            min = 1;
-            max = 10;
-            step = 1;
-            initial = 1;
-            icon = "mdi:bowl-mix";
-            unit_of_measurement = "portions";
-          }
-        ) feeders
-      );
+      # Plain local helpers paired with the feeder buttons below (never MQTT
+      # entities themselves) -- there's nothing to report to or read from
+      # the device until a button actually reads and sends one of these.
+      input_number = lib.listToAttrs (lib.concatMap feederNumberHelpers feeders);
+      input_text = lib.listToAttrs (lib.concatMap feederTextHelpers feeders);
+      input_datetime = lib.listToAttrs (lib.concatMap feederTimeHelpers feeders);
       # One Device per feeder (Settings > Devices & Services > MQTT), built
       # from the `feeders` list up top. Uses the existing `frigate` MQTT
       # connection (see age.secrets.mqtt-password above) -- no separate
@@ -597,6 +954,9 @@ in
         binary_sensor = lib.concatMap feederBinarySensors feeders;
         sensor = lib.concatMap feederSensors feeders;
         cover = lib.concatMap feederCovers feeders;
+        switch = lib.concatMap feederSwitches feeders;
+        number = lib.concatMap feederNumbers feeders;
+        select = lib.concatMap feederSelects feeders;
         button = lib.concatMap feederButtons feeders;
       };
       "switch" = [
