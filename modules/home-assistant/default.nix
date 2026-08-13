@@ -740,6 +740,24 @@ let
       {%- endif -%}
     {% endmacro %}
   '';
+  # Shared Jinja macro to gather NWS's official Heat Index (°F) directly from
+  # NWS's gridpoints API feed (sensor.nws_gridpoints), falling back to NWS's
+  # apparentTemperature if heatIndex is null (e.g. cold weather).
+  nwsHeatIndexMacro = ''
+    {% macro nws_heat_index(idx=0) %}
+      {%- set hi_attr = state_attr('sensor.nws_gridpoints', 'heatIndex') -%}
+      {%- set app_attr = state_attr('sensor.nws_gridpoints', 'apparentTemperature') -%}
+      {%- set hi_val = (hi_attr.values[idx].value) if (hi_attr and hi_attr.values and hi_attr.values | length > idx and hi_attr.values[idx].value is not none) else None -%}
+      {%- set app_val = (app_attr.values[idx].value) if (app_attr and app_attr.values and app_attr.values | length > idx and app_attr.values[idx].value is not none) else None -%}
+      {%- set c_val = hi_val if hi_val is not none else app_val -%}
+      {%- if c_val is not none -%}
+        {{- (c_val * 9 / 5 + 32) | round(1) -}}
+      {%- else -%}
+        {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
+        {{- (periods[idx].temperature) if (periods and periods | length > idx) else None -}}
+      {%- endif -%}
+    {% endmacro %}
+  '';
 in
 {
   # Shared credential for the MQTT broker hosted on newyork (see nix-homelab).
@@ -819,18 +837,32 @@ in
               cards = [
                 {
                   # weather.nws is the declarative template entity defined
-                  # under config.weather below, built from NWS's own 12-hour
-                  # period forecast (day/night pairs) -- hence twice_daily,
-                  # not daily. Replaced weather.forecast_home (the `met`
+                  # under config.weather below, built from NWS's own hourly
+                  # period forecast feed. Replaced weather.forecast_home (the `met`
                   # integration that self-registered during onboarding) as
                   # the data source; `met` is still installed but unused.
                   type = "weather-forecast";
                   entity = "weather.nws";
-                  forecast_type = "twice_daily";
+                  forecast_type = "hourly";
                 }
                 {
                   type = "horizontal-stack";
                   cards = [
+                    {
+                      type = "entities";
+                      entities = [
+                        {
+                          entity = "sensor.nws_heat_index";
+                          name = "Heat Index";
+                          icon = "mdi:thermometer-lines";
+                        }
+                        {
+                          entity = "sensor.nws_precipitation_chance";
+                          name = "Precipitation Chance";
+                          icon = "mdi:weather-rainy";
+                        }
+                      ];
+                    }
                     {
                       type = "markdown";
                       title = "Active Weather Hazards";
@@ -962,6 +994,7 @@ in
       recorder.exclude.entities = [
         "sensor.nws_forecast"
         "sensor.nws_hourly_forecast"
+        "sensor.nws_gridpoints"
       ];
       # Plain local helpers paired with the feeder buttons below (never MQTT
       # entities themselves) -- there's nothing to report to or read from
@@ -1064,6 +1097,27 @@ in
           json_attributes = [ "periods" ];
           scan_interval = 1800;
         }
+        {
+          # Raw gridpoint forecast from NWS. Sourced directly from
+          # https://api.weather.gov/gridpoints/HUN/59,44 to gather NWS's own
+          # official heatIndex and apparentTemperature forecast data.
+          platform = "rest";
+          name = "NWS Gridpoints";
+          resource = "https://api.weather.gov/gridpoints/${nwsGridOffice}/${nwsGridX},${nwsGridY}";
+          method = "GET";
+          headers = {
+            User-Agent = nwsUserAgent;
+            Accept = "application/geo+json";
+          };
+          value_template = "{{ value_json.properties.updateTime }}";
+          device_class = "timestamp";
+          json_attributes_path = "$.properties";
+          json_attributes = [
+            "heatIndex"
+            "apparentTemperature"
+          ];
+          scan_interval = 1800;
+        }
       ]
       # WAN upload/download throughput, read straight from newyork's own
       # Prometheus (hosts/newyork/modules/services/prometheus.nix) rather than
@@ -1106,6 +1160,38 @@ in
       # `platform: template` form (for both binary_sensor and weather below)
       # is deprecated and stops working in HA 2026.6.
       template = [
+        {
+          sensor = [
+            {
+              name = "NWS Heat Index";
+              default_entity_id = "sensor.nws_heat_index";
+              unit_of_measurement = "°F";
+              device_class = "temperature";
+              state_class = "measurement";
+              icon = "mdi:thermometer-lines";
+              state = ''
+                ${nwsHeatIndexMacro}
+                {{- nws_heat_index(0) | default('unavailable') -}}
+              '';
+              availability = "{{ states('sensor.nws_gridpoints') not in ['unknown', 'unavailable'] }}";
+            }
+            {
+              name = "NWS Precipitation Chance";
+              default_entity_id = "sensor.nws_precipitation_chance";
+              unit_of_measurement = "%";
+              icon = "mdi:weather-rainy";
+              state = ''
+                {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
+                {%- if periods -%}
+                  {{- periods[0].probabilityOfPrecipitation.value | default(0) -}}
+                {%- else -%}
+                  unavailable
+                {%- endif -%}
+              '';
+              availability = "{{ states('sensor.nws_hourly_forecast') not in ['unknown', 'unavailable'] and (state_attr('sensor.nws_hourly_forecast', 'periods') | default([]) | length > 0) }}";
+            }
+          ];
+        }
         {
           binary_sensor =
             map
@@ -1163,10 +1249,7 @@ in
             {
               name = "NWS";
               attribution = "Forecast data from the National Weather Service (api.weather.gov).";
-              # Only NWS's 12-hour period forecast is available from this feed
-              # (no separate current-observation call), so "current" conditions
-              # here are really "the nearest upcoming period" -- the same
-              # simplification the daily card was already making with `met`.
+              # Sourced from NWS's hourly period forecast feed (sensor.nws_hourly_forecast).
               # Every `{% %}` control tag below is `-`-trimmed on both sides, and
               # every final `{{ }}` output is too (`{{- ... -}}`) -- Jinja only
               # auto-strips whitespace *adjacent to `{% %}` tags* (HA's template
@@ -1178,29 +1261,54 @@ in
               # enum match like `condition`.
               condition = ''
                 ${nwsConditionMap}
-                {%- set periods = state_attr('sensor.nws_forecast', 'periods') or [] -%}
+                {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
                 {{- nws_condition(periods[0]) if periods else None -}}
               '';
               temperature = ''
-                {%- set periods = state_attr('sensor.nws_forecast', 'periods') or [] -%}
+                {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
                 {{- periods[0].temperature if periods else None -}}
               '';
+              apparent_temperature = ''
+                ${nwsHeatIndexMacro}
+                {{- nws_heat_index(0) -}}
+              '';
               wind_speed = ''
-                {%- set periods = state_attr('sensor.nws_forecast', 'periods') or [] -%}
+                {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
                 {%- set nums = (periods[0].windSpeed | regex_findall('[0-9]+') | map('int') | list) if periods else [] -%}
                 {{- ((nums | sum) / (nums | length)) if nums | length > 0 else None -}}
               '';
               wind_bearing = ''
-                {%- set periods = state_attr('sensor.nws_forecast', 'periods') or [] -%}
+                {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
                 {{- (periods[0].windDirection or None) if periods else None -}}
               '';
               humidity = ''
-                {%- set periods = state_attr('sensor.nws_forecast_hourly', 'periods') or [] -%}
+                {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
                 {{- periods[0].relativeHumidity.value if periods else None -}}
               '';
               # Pressure/visibility aren't in any of NWS's forecast feeds (only
               # its per-station observations, a different endpoint this doesn't
               # call), so the entity just omits those attributes.
+              forecast_hourly = ''
+                ${nwsConditionMap}
+                ${nwsHeatIndexMacro}
+                {%- set ns = namespace(forecast=[]) -%}
+                {%- for period in state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
+                  {%- set idx = loop.index0 -%}
+                  {%- set nums = period.windSpeed | regex_findall('[0-9]+') | map('int') | list -%}
+                  {%- set ns.forecast = ns.forecast + [{
+                    'datetime': period.startTime,
+                    'is_daytime': period.isDaytime,
+                    'condition': nws_condition(period),
+                    'temperature': period.temperature,
+                    'apparent_temperature': nws_heat_index(idx) | float(period.temperature),
+                    'precipitation_probability': period.probabilityOfPrecipitation.value | default(0),
+                    'humidity': period.relativeHumidity.value if period.relativeHumidity else None,
+                    'wind_speed': ((nums | sum) / (nums | length)) if nums | length > 0 else 0,
+                    'wind_bearing': period.windDirection or None,
+                  }] -%}
+                {%- endfor -%}
+                {{- ns.forecast -}}
+              '';
               forecast_twice_daily = ''
                 ${nwsConditionMap}
                 {%- set ns = namespace(forecast=[]) -%}
