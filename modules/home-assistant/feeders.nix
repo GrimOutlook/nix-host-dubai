@@ -48,9 +48,9 @@ let
   feederTopic = deviceId: leaf: "dl/PLAF301/${deviceId}/device/${leaf}";
   # Every feeder multiplexes many event kinds onto one `event/post` topic
   # (GRAIN_OUTPUT_EVENT, WAREHOUSE_DOOR_EVENT, PET_IDENTIFY_EVENT, ...) --
-  # an entity that only cares about one kind renders `None` for every other
-  # kind, which is MQTT-integration shorthand for "discard this update,
-  # keep my last known state" rather than overwriting it with garbage.
+  # an entity that only cares about one kind renders `this.state` for every
+  # other kind, preserving its current state instead of rendering `None`
+  # (which HA parses as an invalid value, resetting the entity to `unknown`).
   feederBinarySensors =
     { name, deviceId }:
     [
@@ -87,10 +87,10 @@ let
             {%- elif value_json.execStep == 'GRAIN_END' or value_json.finished -%}
               {{- 'OFF' -}}
             {%- else -%}
-              {{- None -}}
+              {{- this.state | upper if (this is defined and this.state in ['on', 'off']) else 'OFF' -}}
             {%- endif -%}
           {%- else -%}
-            {{- None -}}
+            {{- this.state | upper if (this is defined and this.state in ['on', 'off']) else 'OFF' -}}
           {%- endif -%}
         '';
         payload_on = "ON";
@@ -126,7 +126,7 @@ let
           {%- if value_json.cmd == 'GRAIN_OUTPUT_EVENT' and value_json.finished -%}
             {{- now().isoformat() -}}
           {%- else -%}
-            {{- None -}}
+            {{- this.state if this is defined else 'unknown' -}}
           {%- endif -%}
         '';
         device_class = "timestamp";
@@ -145,15 +145,17 @@ let
           {%- if value_json.cmd == 'PET_IDENTIFY_EVENT' -%}
             {{- value_json.calibrationTag -}}
           {%- else -%}
-            {{- None -}}
+            {{- this.state if this is defined else 'unknown' -}}
           {%- endif -%}
         '';
         json_attributes_topic = feederTopic deviceId "event/post";
         json_attributes_template = ''
           {%- if value_json.cmd == 'PET_IDENTIFY_EVENT' -%}
-            {{- {'member_id': value_json.memberId} -}}
+            {{- {'member_id': value_json.memberId} | tojson -}}
+          {%- elif this is defined and 'member_id' in this.attributes -%}
+            {{- {'member_id': this.attributes.member_id} | tojson -}}
           {%- else -%}
-            {{- None -}}
+            {{- {} | tojson -}}
           {%- endif -%}
         '';
         icon = "mdi:paw";
@@ -172,7 +174,7 @@ let
           {%- if value_json.cmd == 'MACHINE_INFRARED_EVENT' -%}
             {{- now().isoformat() -}}
           {%- else -%}
-            {{- None -}}
+            {{- this.state if this is defined else 'unknown' -}}
           {%- endif -%}
         '';
         device_class = "timestamp";
@@ -196,15 +198,17 @@ let
           {%- if value_json.cmd == 'ERROR_EVENT' -%}
             {{- value_json.errorMsg -}}
           {%- else -%}
-            {{- None -}}
+            {{- this.state if this is defined else 'unknown' -}}
           {%- endif -%}
         '';
         json_attributes_topic = feederTopic deviceId "event/post";
         json_attributes_template = ''
           {%- if value_json.cmd == 'ERROR_EVENT' -%}
-            {{- {'error_code': value_json.errorCode, 'at': now().isoformat()} -}}
+            {{- {'error_code': value_json.errorCode, 'at': now().isoformat()} | tojson -}}
+          {%- elif this is defined and 'error_code' in this.attributes -%}
+            {{- {'error_code': this.attributes.error_code, 'at': this.attributes.at} | tojson -}}
           {%- else -%}
-            {{- None -}}
+            {{- {} | tojson -}}
           {%- endif -%}
         '';
         icon = "mdi:alert";
@@ -222,7 +226,7 @@ let
           {%- if value_json.cmd == 'DEVICE_START_EVENT' -%}
             {{- now().isoformat() -}}
           {%- else -%}
-            {{- None -}}
+            {{- this.state if this is defined else 'unknown' -}}
           {%- endif -%}
         '';
         json_attributes_topic = feederTopic deviceId "event/post";
@@ -233,9 +237,16 @@ let
               'software_version': value_json.softwareVersion,
               'power_cycle': value_json.powerCycle,
               'restart_reason': value_json.restartReason,
-            } -}}
+            } | tojson -}}
+          {%- elif this is defined and 'hardware_version' in this.attributes -%}
+            {{- {
+              'hardware_version': this.attributes.hardware_version,
+              'software_version': this.attributes.software_version,
+              'power_cycle': this.attributes.power_cycle,
+              'restart_reason': this.attributes.restart_reason,
+            } | tojson -}}
           {%- else -%}
-            {{- None -}}
+            {{- {} | tojson -}}
           {%- endif -%}
         '';
         device_class = "timestamp";
@@ -253,9 +264,9 @@ let
         unique_id = "${deviceId}_last_service_response";
         device = feederDevice { inherit name deviceId; };
         state_topic = feederTopic deviceId "service/post";
-        value_template = "{{ value_json.code | default('unknown') }}";
+        value_template = "{{ value_json.code if (value_json.code is defined) else (this.state if this is defined else 'unknown') }}";
         json_attributes_topic = feederTopic deviceId "service/post";
-        json_attributes_template = "{{ value_json }}";
+        json_attributes_template = "{{ value_json | tojson if (value_json is defined and value_json) else (this.attributes | tojson if this is defined else {} | tojson) }}";
         icon = "mdi:message-reply-text";
         entity_category = "diagnostic";
       }
@@ -273,15 +284,15 @@ let
           {%- if value_json.cmd == 'DEVICE_LOG_REPORT_EVENT' -%}
             {{- now().isoformat() -}}
           {%- else -%}
-            {{- None -}}
+            {{- this.state if this is defined else 'unknown' -}}
           {%- endif -%}
         '';
         json_attributes_topic = feederTopic deviceId "event/post";
         json_attributes_template = ''
           {%- if value_json.cmd == 'DEVICE_LOG_REPORT_EVENT' -%}
-            {{- value_json -}}
+            {{- value_json | tojson -}}
           {%- else -%}
-            {{- None -}}
+            {{- this.attributes | tojson if this is defined else {} | tojson -}}
           {%- endif -%}
         '';
         device_class = "timestamp";
@@ -317,7 +328,7 @@ let
           {%- if value_json.cmd == 'WAREHOUSE_DOOR_EVENT' -%}
             {{- 'open' if value_json.triggerType == 'COVER_OPEN' else 'closed' -}}
           {%- else -%}
-            {{- None -}}
+            {{- this.state if this is defined else 'closed' -}}
           {%- endif -%}
         '';
         device_class = "door";
