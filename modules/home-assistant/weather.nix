@@ -54,8 +54,14 @@ let
     {% macro nws_heat_index(idx=0) %}
       {%- set hi_attr = state_attr('sensor.nws_gridpoints', 'heatIndex') -%}
       {%- set app_attr = state_attr('sensor.nws_gridpoints', 'apparentTemperature') -%}
-      {%- set hi_val = (hi_attr.values[idx].value) if (hi_attr and hi_attr.values and hi_attr.values | length > idx and hi_attr.values[idx].value is not none) else None -%}
-      {%- set app_val = (app_attr.values[idx].value) if (app_attr and app_attr.values and app_attr.values | length > idx and app_attr.values[idx].value is not none) else None -%}
+      {#- `['values']`, not `.values` -- these are plain dicts from the JSON
+         response, so dot-access resolves to Python's dict.values() *method*
+         instead of the "values" key, which then blows up piped into
+         `| length`. This silently broke every render of this macro,
+         including forecast_hourly (the weather card's hourly forecast never
+         loaded) and the standalone heat-index sensor. -#}
+      {%- set hi_val = (hi_attr['values'][idx].value) if (hi_attr and hi_attr['values'] and hi_attr['values'] | length > idx and hi_attr['values'][idx].value is not none) else None -%}
+      {%- set app_val = (app_attr['values'][idx].value) if (app_attr and app_attr['values'] and app_attr['values'] | length > idx and app_attr['values'][idx].value is not none) else None -%}
       {%- set c_val = hi_val if hi_val is not none else app_val -%}
       {%- if c_val is not none -%}
         {{- (c_val * 9 / 5 + 32) | round(1) -}}
