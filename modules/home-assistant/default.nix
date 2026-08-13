@@ -481,6 +481,37 @@ let
         optimistic = true;
         icon = "mdi:timer-outline";
       }
+      {
+        # ATTR_SET_SERVICE's handler (disassembled from earlynerd's
+        # stock_backup_8M_sanitized.bin, ARM Thumb-2/capstone) reads this
+        # field via cJSON's `valuestring` (struct offset 0x10), not
+        # `valueint` (0x14) the way closeDoorTimeSec does -- confirmed
+        # against the unambiguous log format string "cover_close_speed=%d"
+        # a few instructions later. So unlike every other ATTR_SET_SERVICE
+        # field in this file, this one has to be sent as a JSON *string*;
+        # a bare int leaves valuestring NULL and silently fails to apply
+        # (same failure mode the original barnDoorState investigation hit
+        # before the right field name was found).
+        #
+        # The value's actual valid range is still NOT confirmed: it's
+        # parsed through a helper function whose own bounds-check (if any)
+        # wasn't safely resolvable from this disassembly pass -- the
+        # literal pool reference for that helper's address didn't land in
+        # a sane code region, most likely because this flash dump bundles
+        # multiple independently-based images (bootloader/KM0/KM4) and
+        # 0-100 below is still an unverified guess, not a confirmed limit.
+        # Test in small steps.
+        name = "Close Speed";
+        unique_id = "${deviceId}_close_speed";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        command_template = "{{ {'cmd': 'ATTR_SET_SERVICE', 'coverCloseSpeed': value | int | string} | tojson }}";
+        min = 0;
+        max = 100;
+        step = 1;
+        optimistic = true;
+        icon = "mdi:speedometer";
+      }
     ];
   feederSelects =
     { name, deviceId }:
