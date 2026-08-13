@@ -5,6 +5,302 @@
   ...
 }:
 let
+  # PETLIBRO PLAF301 feeders, redirected from Petlibro's own cloud to
+  # newyork's local mosquitto broker instead -- see ~/projects/
+  # feeder-jailbreak (topic layout and command/event JSON schemas, both
+  # reverse-engineered via firmware disassembly, not documented by Petlibro
+  # anywhere) and hosts/newyork/modules/services/mosquitto/default.nix (the
+  # broker-side ACL these devices actually authenticate against). HA
+  # connects to that same broker as `frigate` (readwrite on everything, see
+  # the age.secrets comment below), so no separate credential is needed
+  # here -- these entities just add topics on top of that existing
+  # connection. `feed-extra` (homelab/hosts.nix has its MAC) is excluded:
+  # no device ID/credentials have been captured for it yet, unlike the
+  # three below.
+  feeders = [
+    {
+      name = "feed-jem";
+      deviceId = "AF0601030298F0C1320D";
+    }
+    {
+      name = "feed-willow";
+      deviceId = "AF0600310007DF0B19802Q";
+    }
+    {
+      name = "feed-fern";
+      deviceId = "AF06013A96214C47U";
+    }
+  ];
+  feederDevice =
+    { name, deviceId }:
+    {
+      identifiers = [ "plaf301_${deviceId}" ];
+      inherit name;
+      manufacturer = "PETLIBRO";
+      model = "PLAF301";
+    };
+  # "feed-jem" -> "feed_jem", matching HA's own slugification of entity
+  # names -- used to reference the paired input_number helper (below) from
+  # inside the Feed Now button's payload_press template by a name we
+  # control directly, rather than guessing how HA would slug it.
+  feederKey = name: builtins.replaceStrings [ "-" ] [ "_" ] name;
+  # dl/PLAF301/{deviceId}/device/{ntp,ota,config,event,service,system}/{sub,post}
+  # -- `sub` topics are commands published TO the device, `post` topics are
+  # the device reporting TO us. `heart`/`event` aren't in that six-name set
+  # (heartbeats and structured events get their own leaves), confirmed by
+  # direct observation in feeder-jailbreak/FINDINGS.md's live session
+  # capture rather than by the naming pattern above.
+  feederTopic = deviceId: leaf: "dl/PLAF301/${deviceId}/device/${leaf}";
+  # Every feeder multiplexes many event kinds onto one `event/post` topic
+  # (GRAIN_OUTPUT_EVENT, WAREHOUSE_DOOR_EVENT, PET_IDENTIFY_EVENT, ...) --
+  # an entity that only cares about one kind renders `None` for every other
+  # kind, which is MQTT-integration shorthand for "discard this update,
+  # keep my last known state" rather than overwriting it with garbage.
+  feederBinarySensors =
+    { name, deviceId }:
+    [
+      {
+        name = "Online";
+        unique_id = "${deviceId}_online";
+        device = feederDevice { inherit name deviceId; };
+        state_topic = feederTopic deviceId "heart/post";
+        value_template = "{{ 'ON' if value_json.cmd == 'HEARTBEAT' else 'OFF' }}";
+        payload_on = "ON";
+        payload_off = "OFF";
+        # Heartbeats land every 60-70s (feeder-jailbreak/FINDINGS.md) --
+        # 150s covers one dropped beat before flagging offline, without
+        # being so long a real outage takes minutes to notice.
+        expire_after = 150;
+        device_class = "connectivity";
+      }
+      {
+        # execStep's GRAIN_BLOCKING/GRAIN_BLOCKED/GRAIN_STUCK values
+        # (mqtt_command_reference.md's "Common Error/Status Strings") are
+        # jam states reported on the same GRAIN_OUTPUT_EVENT stream "Last
+        # Fed" below already reads -- unlike the ERROR_EVENT-sourced
+        # sensors further down, this one gets a real binary on/off because
+        # its clear condition is just as well-documented as its set
+        # condition (a normal GRAIN_END/finished completion).
+        name = "Feed Jam";
+        unique_id = "${deviceId}_feed_jam";
+        device = feederDevice { inherit name deviceId; };
+        state_topic = feederTopic deviceId "event/post";
+        value_template = ''
+          {%- if value_json.cmd == 'GRAIN_OUTPUT_EVENT' -%}
+            {%- if value_json.execStep in ['GRAIN_BLOCKING', 'GRAIN_BLOCKED', 'GRAIN_STUCK'] -%}
+              {{- 'ON' -}}
+            {%- elif value_json.execStep == 'GRAIN_END' or value_json.finished -%}
+              {{- 'OFF' -}}
+            {%- else -%}
+              {{- None -}}
+            {%- endif -%}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        payload_on = "ON";
+        payload_off = "OFF";
+        device_class = "problem";
+      }
+    ];
+  feederSensors =
+    { name, deviceId }:
+    [
+      {
+        name = "Signal Strength";
+        unique_id = "${deviceId}_rssi";
+        device = feederDevice { inherit name deviceId; };
+        state_topic = feederTopic deviceId "heart/post";
+        value_template = "{{ value_json.rssi }}";
+        device_class = "signal_strength";
+        unit_of_measurement = "dBm";
+        state_class = "measurement";
+        entity_category = "diagnostic";
+      }
+      {
+        name = "Last Fed";
+        unique_id = "${deviceId}_last_fed";
+        device = feederDevice { inherit name deviceId; };
+        state_topic = feederTopic deviceId "event/post";
+        # The device doesn't put its own wall-clock time on this event, so
+        # this is "when HA saw the finish" rather than "when the device
+        # says it finished" -- close enough given events arrive within a
+        # second or two of the real thing. Same caveat applies to every
+        # other now().isoformat()-based sensor below.
+        value_template = ''
+          {%- if value_json.cmd == 'GRAIN_OUTPUT_EVENT' and value_json.finished -%}
+            {{- now().isoformat() -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        device_class = "timestamp";
+      }
+      {
+        # PET_IDENTIFY_EVENT fires when an RFID collar comes into range.
+        # State is the raw tag, not a pet name -- there's no memberId ->
+        # pet-name mapping anywhere in this config (ADD_OR_UPDATE_RFID_SERVICE,
+        # which would set one, has never been sent), so calibrationTag is
+        # the only thing guaranteed to mean something.
+        name = "Pet Last Scanned";
+        unique_id = "${deviceId}_last_scanned";
+        device = feederDevice { inherit name deviceId; };
+        state_topic = feederTopic deviceId "event/post";
+        value_template = ''
+          {%- if value_json.cmd == 'PET_IDENTIFY_EVENT' -%}
+            {{- value_json.calibrationTag -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        json_attributes_topic = feederTopic deviceId "event/post";
+        json_attributes_template = ''
+          {%- if value_json.cmd == 'PET_IDENTIFY_EVENT' -%}
+            {{- {'member_id': value_json.memberId} -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        icon = "mdi:paw";
+      }
+      {
+        # MACHINE_INFRARED_EVENT: the bowl's break-beam/presence sensor.
+        # FINDINGS.md only confirms *that* this fires, not any field names
+        # inside it (unlike the events above, which were seen with full
+        # payloads) -- so this reports "when it last fired" rather than
+        # guessing at a boolean field that isn't documented anywhere.
+        name = "Bowl Activity";
+        unique_id = "${deviceId}_bowl_activity";
+        device = feederDevice { inherit name deviceId; };
+        state_topic = feederTopic deviceId "event/post";
+        value_template = ''
+          {%- if value_json.cmd == 'MACHINE_INFRARED_EVENT' -%}
+            {{- now().isoformat() -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        device_class = "timestamp";
+        entity_category = "diagnostic";
+      }
+      {
+        # ERROR_EVENT covers everything in mqtt_command_reference.md's
+        # "Common Error/Status Strings" that isn't the feed jam above --
+        # LOW_FOOD, LOW_BATTERY, BARN_OPEN_DOOR_ERROR/BARN_CLOSE_DOOR_ERROR,
+        # OFFLINE/NETWORK_*. One generic "last error" sensor instead of a
+        # binary_sensor per condition: none of these have a documented
+        # clear/resolved counterpart event the way the feed jam does, so a
+        # binary_sensor here could only ever latch on and never honestly
+        # turn back off. This just reports the most recent one instead of
+        # claiming to know current state.
+        name = "Last Error";
+        unique_id = "${deviceId}_last_error";
+        device = feederDevice { inherit name deviceId; };
+        state_topic = feederTopic deviceId "event/post";
+        value_template = ''
+          {%- if value_json.cmd == 'ERROR_EVENT' -%}
+            {{- value_json.errorMsg -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        json_attributes_topic = feederTopic deviceId "event/post";
+        json_attributes_template = ''
+          {%- if value_json.cmd == 'ERROR_EVENT' -%}
+            {{- {'error_code': value_json.errorCode, 'at': now().isoformat()} -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        icon = "mdi:alert";
+        entity_category = "diagnostic";
+      }
+      {
+        # DEVICE_START_EVENT fires once per boot -- useful mainly to
+        # confirm an unexpected reboot happened at all (restartReason,
+        # powerCycle) rather than anything ongoing.
+        name = "Last Boot";
+        unique_id = "${deviceId}_last_boot";
+        device = feederDevice { inherit name deviceId; };
+        state_topic = feederTopic deviceId "event/post";
+        value_template = ''
+          {%- if value_json.cmd == 'DEVICE_START_EVENT' -%}
+            {{- now().isoformat() -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        json_attributes_topic = feederTopic deviceId "event/post";
+        json_attributes_template = ''
+          {%- if value_json.cmd == 'DEVICE_START_EVENT' -%}
+            {{- {
+              'hardware_version': value_json.hardwareVersion,
+              'software_version': value_json.softwareVersion,
+              'power_cycle': value_json.powerCycle,
+              'restart_reason': value_json.restartReason,
+            } -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        device_class = "timestamp";
+        entity_category = "diagnostic";
+      }
+    ];
+  feederCovers =
+    { name, deviceId }:
+    [
+      {
+        # `cover`/device_class `door` fits the lid better than a plain
+        # switch: SWITCH_DOOR_SERVICE's own closeDoorTimeSec auto-close
+        # timer means the device flips itself back to closed on its own a
+        # few seconds after opening (confirmed live, feeder-jailbreak/
+        # FINDINGS.md "2026-08-12 (latest)"), and WAREHOUSE_DOOR_EVENT
+        # reports that self-close the same as a commanded one -- so this
+        # entity's state tracks reality either way, not just what HA asked
+        # for.
+        name = "Lid";
+        unique_id = "${deviceId}_lid";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        payload_open = builtins.toJSON {
+          cmd = "SWITCH_DOOR_SERVICE";
+          barnDoorState = 1;
+        };
+        payload_close = builtins.toJSON {
+          cmd = "SWITCH_DOOR_SERVICE";
+          barnDoorState = 0;
+        };
+        state_topic = feederTopic deviceId "event/post";
+        value_template = ''
+          {%- if value_json.cmd == 'WAREHOUSE_DOOR_EVENT' -%}
+            {{- 'open' if value_json.triggerType == 'COVER_OPEN' else 'closed' -}}
+          {%- else -%}
+            {{- None -}}
+          {%- endif -%}
+        '';
+        device_class = "door";
+      }
+    ];
+  feederButtons =
+    { name, deviceId }:
+    [
+      {
+        name = "Feed Now";
+        unique_id = "${deviceId}_feed_now";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        # Unlike the fixed payloads elsewhere in this file, this one has to
+        # be a live template (not builtins.toJSON at build time) -- it
+        # reads the paired input_number helper's *current* value each time
+        # the button is pressed, defaulting to 1 portion if that helper is
+        # ever unknown/non-numeric (e.g. right after a HA restart, before
+        # its state has been restored).
+        payload_press = ''
+          {{ {'cmd': 'MANUAL_FEEDING_SERVICE', 'grainNum': states('input_number.${feederKey name}_feed_amount') | int(1)} | tojson }}
+        '';
+      }
+    ];
   # House coordinates, shared by every NWS API call below (the alerts feed
   # and the forecast feed) so they can't drift out of sync with each other.
   nwsLat = "34.7608002429598";
@@ -275,6 +571,34 @@ in
         "sensor.nws_forecast"
         "sensor.nws_hourly_forecast"
       ];
+      # Paired with each feeder's "Feed Now" button (config.mqtt.button
+      # below) -- a plain local helper, not an MQTT entity itself, since
+      # there's nothing to report to or read from the device until the
+      # button is actually pressed.
+      input_number = lib.listToAttrs (
+        map (
+          f:
+          lib.nameValuePair "${feederKey f.name}_feed_amount" {
+            name = "${f.name} Feed Amount";
+            min = 1;
+            max = 10;
+            step = 1;
+            initial = 1;
+            icon = "mdi:bowl-mix";
+            unit_of_measurement = "portions";
+          }
+        ) feeders
+      );
+      # One Device per feeder (Settings > Devices & Services > MQTT), built
+      # from the `feeders` list up top. Uses the existing `frigate` MQTT
+      # connection (see age.secrets.mqtt-password above) -- no separate
+      # broker credential needed for HA itself.
+      mqtt = {
+        binary_sensor = lib.concatMap feederBinarySensors feeders;
+        sensor = lib.concatMap feederSensors feeders;
+        cover = lib.concatMap feederCovers feeders;
+        button = lib.concatMap feederButtons feeders;
+      };
       "switch" = [
         {
           platform = "gpio";
