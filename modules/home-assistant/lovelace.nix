@@ -154,6 +154,12 @@
             entity = "camera.back_gate";
             camera_view = "live";
           }
+          {
+            type = "picture-entity";
+            title = "Library";
+            entity = "camera.library";
+            camera_view = "live";
+          }
         ];
       }
     ];
