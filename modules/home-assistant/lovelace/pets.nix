@@ -10,6 +10,7 @@
       cameras = [
         {
           camera_entity = "camera.library";
+          live_provider = "go2rtc";
         }
       ];
     }
