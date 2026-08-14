@@ -1,0 +1,130 @@
+{ }:
+{
+  title = "Pets";
+  path = "pets";
+  icon = "mdi:paw";
+  cards = [
+    {
+      type = "picture-entity";
+      title = "Library";
+      entity = "camera.library";
+      camera_view = "live";
+    }
+    {
+      type = "entities";
+      title = "Pet Feeders";
+      entities = [
+        {
+          entity = "sensor.feed_jem_last_fed";
+          name = "Jem Last Fed";
+          icon = "mdi:food-drumstick";
+        }
+        {
+          entity = "sensor.feed_willow_last_fed";
+          name = "Willow Last Fed";
+          icon = "mdi:food-drumstick";
+        }
+        {
+          entity = "sensor.feed_fern_last_fed";
+          name = "Fern Last Fed";
+          icon = "mdi:food-drumstick";
+        }
+      ];
+    }
+    {
+      type = "vertical-stack";
+      cards = [
+        {
+          type = "conditional";
+          conditions = [
+            {
+              entity = "persistent_notification.feed_jem_low_food";
+              state_not = "unavailable";
+            }
+          ];
+          card = {
+            type = "vertical-stack";
+            cards = [
+              {
+                type = "markdown";
+                content = "⚠️ **Low Food Warning:** Feeder **feed-jem** reported LOW_FOOD. Please refill the food hopper.";
+              }
+              {
+                type = "button";
+                name = "Dismiss Jem Low Food Alert";
+                icon = "mdi:bell-off";
+                tap_action = {
+                  action = "call-service";
+                  service = "persistent_notification.dismiss";
+                  data = {
+                    notification_id = "feed_jem_low_food";
+                  };
+                };
+              }
+            ];
+          };
+        }
+        {
+          type = "conditional";
+          conditions = [
+            {
+              entity = "persistent_notification.feed_willow_low_food";
+              state_not = "unavailable";
+            }
+          ];
+          card = {
+            type = "vertical-stack";
+            cards = [
+              {
+                type = "markdown";
+                content = "⚠️ **Low Food Warning:** Feeder **feed-willow** reported LOW_FOOD. Please refill the food hopper.";
+              }
+              {
+                type = "button";
+                name = "Dismiss Willow Low Food Alert";
+                icon = "mdi:bell-off";
+                tap_action = {
+                  action = "call-service";
+                  service = "persistent_notification.dismiss";
+                  data = {
+                    notification_id = "feed_willow_low_food";
+                  };
+                };
+              }
+            ];
+          };
+        }
+        {
+          type = "conditional";
+          conditions = [
+            {
+              entity = "persistent_notification.feed_fern_low_food";
+              state_not = "unavailable";
+            }
+          ];
+          card = {
+            type = "vertical-stack";
+            cards = [
+              {
+                type = "markdown";
+                content = "⚠️ **Low Food Warning:** Feeder **feed-fern** reported LOW_FOOD. Please refill the food hopper.";
+              }
+              {
+                type = "button";
+                name = "Dismiss Fern Low Food Alert";
+                icon = "mdi:bell-off";
+                tap_action = {
+                  action = "call-service";
+                  service = "persistent_notification.dismiss";
+                  data = {
+                    notification_id = "feed_fern_low_food";
+                  };
+                };
+              }
+            ];
+          };
+        }
+      ];
+    }
+  ];
+}
