@@ -77,9 +77,13 @@ in
     # -- its chart mode can plot apparent_temperature (feels-like) as its own
     # forecast line, which the previously-used stock weather-forecast card and
     # weather-chart-card can't do at all.
-    customLovelaceModules = with pkgs.home-assistant-custom-lovelace-modules; [
-      card-mod
-    ] ++ [ weatherForecastCard ];
+    customLovelaceModules =
+      with pkgs.home-assistant-custom-lovelace-modules;
+      [
+        advanced-camera-card
+        card-mod
+      ]
+      ++ [ weatherForecastCard ];
 
     lovelaceConfig = lovelaceModule.lovelaceConfig;
 

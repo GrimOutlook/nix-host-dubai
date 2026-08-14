@@ -5,10 +5,13 @@
   icon = "mdi:paw";
   cards = [
     {
-      type = "picture-entity";
+      type = "custom:advanced-camera-card";
       title = "Library";
-      entity = "camera.library";
-      camera_view = "live";
+      cameras = [
+        {
+          camera_entity = "camera.library";
+        }
+      ];
     }
     {
       type = "entities";
