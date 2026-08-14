@@ -75,7 +75,20 @@
                 default_forecast = "hourly";
                 forecast_types = "hourly";
                 current = {
-                  show_attributes = [ "apparent_temperature" ];
+                  # "apparent_temperature" is a real attribute of weather.nws
+                  # (see weather.nix), so it's referenced by name. Precipitation
+                  # chance isn't -- it only exists as the standalone
+                  # sensor.nws_precipitation_chance template sensor -- so it's an
+                  # entity-only (nameless) item instead, which the card renders
+                  # as an arbitrary attribute sourced from that entity's state.
+                  show_attributes = [
+                    "apparent_temperature"
+                    {
+                      entity = "sensor.nws_precipitation_chance";
+                      label = "Precipitation Chance";
+                      icon = "mdi:weather-rainy";
+                    }
+                  ];
                 };
                 forecast = {
                   mode = "chart";
@@ -83,40 +96,20 @@
                 };
               }
               {
-                type = "horizontal-stack";
-                cards = [
-                  {
-                    type = "entities";
-                    entities = [
-                      {
-                        entity = "sensor.nws_heat_index";
-                        name = "Heat Index";
-                        icon = "mdi:thermometer-lines";
-                      }
-                      {
-                        entity = "sensor.nws_precipitation_chance";
-                        name = "Precipitation Chance";
-                        icon = "mdi:weather-rainy";
-                      }
-                    ];
-                  }
-                  {
-                    type = "markdown";
-                    title = "Active Weather Hazards";
-                    content = ''
-                      {% set alerts = state_attr('sensor.nws_active_alerts', 'features') | default([]) %}
-                      {% if alerts | count == 0 %}
-                      ✅ No active weather hazards.
-                      {% else %}
-                      {% for a in alerts %}
-                      **{{ a.properties.event }}**
-                      {{ a.properties.headline }}
+                type = "markdown";
+                title = "Active Weather Hazards";
+                content = ''
+                  {% set alerts = state_attr('sensor.nws_active_alerts', 'features') | default([]) %}
+                  {% if alerts | count == 0 %}
+                  ✅ No active weather hazards.
+                  {% else %}
+                  {% for a in alerts %}
+                  **{{ a.properties.event }}**
+                  {{ a.properties.headline }}
 
-                      {% endfor %}
-                      {% endif %}
-                    '';
-                  }
-                ];
+                  {% endfor %}
+                  {% endif %}
+                '';
               }
             ];
           }

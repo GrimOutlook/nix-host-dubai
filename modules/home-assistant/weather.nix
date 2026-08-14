@@ -51,23 +51,43 @@ let
   # NWS's gridpoints API feed (sensor.nws_gridpoints), falling back to NWS's
   # apparentTemperature if heatIndex is null (e.g. cold weather).
   nwsHeatIndexMacro = ''
-    {% macro nws_heat_index(idx=0) %}
-      {%- set hi_attr = state_attr('sensor.nws_gridpoints', 'heatIndex') -%}
-      {%- set app_attr = state_attr('sensor.nws_gridpoints', 'apparentTemperature') -%}
+    {% macro nws_value_at(attr, target_dt) %}
       {#- `['values']`, not `.values` -- these are plain dicts from the JSON
          response, so dot-access resolves to Python's dict.values() *method*
          instead of the "values" key, which then blows up piped into
          `| length`. This silently broke every render of this macro,
          including forecast_hourly (the weather card's hourly forecast never
          loaded) and the standalone heat-index sensor. -#}
-      {%- set hi_val = (hi_attr['values'][idx].value) if (hi_attr and hi_attr['values'] and hi_attr['values'] | length > idx and hi_attr['values'][idx].value is not none) else None -%}
-      {%- set app_val = (app_attr['values'][idx].value) if (app_attr and app_attr['values'] and app_attr['values'] | length > idx and app_attr['values'][idx].value is not none) else None -%}
+      {#- The gridpoints feed (unlike /forecast/hourly, which NWS truncates
+         to start at "now" on every request) is a rolling window that still
+         includes several hours of *past* entries, and consecutive
+         identical values get merged into a single longer-duration entry --
+         so `values[idx]` by raw array position is NOT "idx hours from now".
+         It can be hours stale, only jumping forward whenever NWS drops old
+         entries from the window (this is what made apparent_temperature
+         look stuck at one value for hours). Entries are sorted ascending by
+         validTime with no gaps, so instead this scans for the *last* entry
+         whose start time has already begun by target_dt -- that's the one
+         actually in effect at that moment. -#}
+      {%- set ns = namespace(val=None) -%}
+      {%- for v in (attr['values'] if attr and attr['values'] else []) -%}
+        {%- set start = as_datetime(v.validTime.split('/')[0]) -%}
+        {%- if start is not none and start <= target_dt and v.value is not none -%}
+          {%- set ns.val = v.value -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{- ns.val if ns.val is not none else "" -}}
+    {% endmacro %}
+    {% macro nws_heat_index(target_dt, fallback_temp=None) %}
+      {%- set hi_attr = state_attr('sensor.nws_gridpoints', 'heatIndex') -%}
+      {%- set app_attr = state_attr('sensor.nws_gridpoints', 'apparentTemperature') -%}
+      {%- set hi_val = nws_value_at(hi_attr, target_dt) | float(None) -%}
+      {%- set app_val = nws_value_at(app_attr, target_dt) | float(None) -%}
       {%- set c_val = hi_val if hi_val is not none else app_val -%}
       {%- if c_val is not none -%}
         {{- (c_val * 9 / 5 + 32) | round(1) -}}
       {%- else -%}
-        {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
-        {{- (periods[idx].temperature) if (periods and periods | length > idx) else None -}}
+        {{- fallback_temp -}}
       {%- endif -%}
     {% endmacro %}
   '';
@@ -99,7 +119,12 @@ in
       # attribute for the actual event names.
       value_template = "{{ value_json.features | length }}";
       json_attributes = [ "features" ];
-      scan_interval = 60;
+      # NWS doesn't publish a numeric rate limit (their docs just say
+      # "generous... for typical use" from direct clients, as opposed to
+      # shared proxies) and this endpoint's own Cache-Control caps at
+      # max-age=5s anyway, so 15s stays well clear of abuse territory while
+      # cutting tornado-warning latency well below the 60s this was at.
+      scan_interval = 15;
     }
     {
       # Feeds the "NWS" template weather entity below (config.weather) --
@@ -181,7 +206,8 @@ in
           icon = "mdi:thermometer-lines";
           state = ''
             ${nwsHeatIndexMacro}
-            {{- nws_heat_index(0) | default('unavailable') -}}
+            {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
+            {{- nws_heat_index(now(), periods[0].temperature if periods else None) | default('unavailable') -}}
           '';
           availability = "{{ states('sensor.nws_gridpoints') not in ['unknown', 'unavailable'] }}";
         }
@@ -280,7 +306,8 @@ in
           '';
           apparent_temperature = ''
             ${nwsHeatIndexMacro}
-            {{- nws_heat_index(0) -}}
+            {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
+            {{- nws_heat_index(now(), periods[0].temperature if periods else None) -}}
           '';
           wind_speed = ''
             {%- set periods = state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
@@ -303,14 +330,13 @@ in
             ${nwsHeatIndexMacro}
             {%- set ns = namespace(forecast=[]) -%}
             {%- for period in state_attr('sensor.nws_hourly_forecast', 'periods') or [] -%}
-              {%- set idx = loop.index0 -%}
               {%- set nums = period.windSpeed | regex_findall('[0-9]+') | map('int') | list -%}
               {%- set ns.forecast = ns.forecast + [{
                 'datetime': period.startTime,
                 'is_daytime': period.isDaytime,
                 'condition': nws_condition(period),
                 'temperature': period.temperature,
-                'apparent_temperature': nws_heat_index(idx) | float(period.temperature),
+                'apparent_temperature': nws_heat_index(as_datetime(period.startTime), period.temperature) | float(period.temperature),
                 'precipitation_probability': period.probabilityOfPrecipitation.value | default(0),
                 'humidity': period.relativeHumidity.value if period.relativeHumidity else None,
                 'wind_speed': ((nums | sum) / (nums | length)) if nums | length > 0 else 0,
