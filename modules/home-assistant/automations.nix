@@ -107,5 +107,72 @@
       ];
       mode = "parallel";
     }
+    {
+      alias = "Feeder feed jam persistent notification";
+      description = "Create or dismiss a persistent notification when a pet feeder detects or clears a feed jam.";
+      trigger = [
+        {
+          platform = "state";
+          entity_id = [
+            "binary_sensor.feed_jem_feed_jam"
+            "binary_sensor.feed_willow_feed_jam"
+            "binary_sensor.feed_fern_feed_jam"
+          ];
+          to = "on";
+          id = "jam_detected";
+        }
+        {
+          platform = "state";
+          entity_id = [
+            "binary_sensor.feed_jem_feed_jam"
+            "binary_sensor.feed_willow_feed_jam"
+            "binary_sensor.feed_fern_feed_jam"
+          ];
+          to = "off";
+          id = "jam_cleared";
+        }
+      ];
+      action = [
+        {
+          choose = [
+            {
+              conditions = [
+                {
+                  condition = "trigger";
+                  id = [ "jam_detected" ];
+                }
+              ];
+              sequence = [
+                {
+                  service = "persistent_notification.create";
+                  data = {
+                    title = "Feeder Jam Alert";
+                    message = "{{ state_attr(trigger.entity_id, 'friendly_name') | default(trigger.entity_id) }} is jammed!";
+                    notification_id = "{{ trigger.entity_id | replace('binary_sensor.', '') | replace('_feed_jam', '') }}_jam";
+                  };
+                }
+              ];
+            }
+            {
+              conditions = [
+                {
+                  condition = "trigger";
+                  id = [ "jam_cleared" ];
+                }
+              ];
+              sequence = [
+                {
+                  service = "persistent_notification.dismiss";
+                  data = {
+                    notification_id = "{{ trigger.entity_id | replace('binary_sensor.', '') | replace('_feed_jam', '') }}_jam";
+                  };
+                }
+              ];
+            }
+          ];
+        }
+      ];
+      mode = "parallel";
+    }
   ];
 }

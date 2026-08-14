@@ -124,6 +124,96 @@
             ];
           };
         }
+        {
+          type = "conditional";
+          conditions = [
+            {
+              entity = "persistent_notification.feed_jem_jam";
+              state_not = "unavailable";
+            }
+          ];
+          card = {
+            type = "vertical-stack";
+            cards = [
+              {
+                type = "markdown";
+                content = "🚨 **Feed Jam Alert:** Feeder **feed-jem** reported a grain jam! Please inspect and clear the dispenser.";
+              }
+              {
+                type = "button";
+                name = "Dismiss Jem Jam Alert";
+                icon = "mdi:bell-off";
+                tap_action = {
+                  action = "call-service";
+                  service = "persistent_notification.dismiss";
+                  data = {
+                    notification_id = "feed_jem_jam";
+                  };
+                };
+              }
+            ];
+          };
+        }
+        {
+          type = "conditional";
+          conditions = [
+            {
+              entity = "persistent_notification.feed_willow_jam";
+              state_not = "unavailable";
+            }
+          ];
+          card = {
+            type = "vertical-stack";
+            cards = [
+              {
+                type = "markdown";
+                content = "🚨 **Feed Jam Alert:** Feeder **feed-willow** reported a grain jam! Please inspect and clear the dispenser.";
+              }
+              {
+                type = "button";
+                name = "Dismiss Willow Jam Alert";
+                icon = "mdi:bell-off";
+                tap_action = {
+                  action = "call-service";
+                  service = "persistent_notification.dismiss";
+                  data = {
+                    notification_id = "feed_willow_jam";
+                  };
+                };
+              }
+            ];
+          };
+        }
+        {
+          type = "conditional";
+          conditions = [
+            {
+              entity = "persistent_notification.feed_fern_jam";
+              state_not = "unavailable";
+            }
+          ];
+          card = {
+            type = "vertical-stack";
+            cards = [
+              {
+                type = "markdown";
+                content = "🚨 **Feed Jam Alert:** Feeder **feed-fern** reported a grain jam! Please inspect and clear the dispenser.";
+              }
+              {
+                type = "button";
+                name = "Dismiss Fern Jam Alert";
+                icon = "mdi:bell-off";
+                tap_action = {
+                  action = "call-service";
+                  service = "persistent_notification.dismiss";
+                  data = {
+                    notification_id = "feed_fern_jam";
+                  };
+                };
+              }
+            ];
+          };
+        }
       ];
     }
   ];
