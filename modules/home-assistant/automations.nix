@@ -81,5 +81,31 @@
       ];
       mode = "single";
     }
+    {
+      alias = "Feeder low food persistent notification";
+      description = "Create a persistent notification when a pet feeder reports LOW_FOOD.";
+      trigger = [
+        {
+          platform = "state";
+          entity_id = [
+            "sensor.feed_jem_last_error"
+            "sensor.feed_willow_last_error"
+            "sensor.feed_fern_last_error"
+          ];
+          to = "LOW_FOOD";
+        }
+      ];
+      action = [
+        {
+          service = "persistent_notification.create";
+          data = {
+            title = "Feeder Low Food Alert";
+            message = "{{ state_attr(trigger.entity_id, 'friendly_name') | default(trigger.entity_id) }} reported LOW_FOOD!";
+            notification_id = "{{ trigger.entity_id | replace('sensor.', '') | replace('_last_error', '') }}_low_food";
+          };
+        }
+      ];
+      mode = "parallel";
+    }
   ];
 }
