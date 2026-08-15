@@ -13,10 +13,6 @@
           live_provider = "go2rtc";
         }
       ];
-      dimensions = {
-        aspect_ratio_mode = "static";
-        aspect_ratio = "16:9";
-      };
     }
     {
       type = "custom:advanced-camera-card";
@@ -27,10 +23,6 @@
           live_provider = "go2rtc";
         }
       ];
-      dimensions = {
-        aspect_ratio_mode = "static";
-        aspect_ratio = "16:9";
-      };
     }
     {
       type = "custom:advanced-camera-card";
@@ -41,10 +33,6 @@
           live_provider = "go2rtc";
         }
       ];
-      dimensions = {
-        aspect_ratio_mode = "static";
-        aspect_ratio = "16:9";
-      };
     }
     {
       type = "custom:advanced-camera-card";
