@@ -5,22 +5,46 @@
   icon = "mdi:cctv";
   cards = [
     {
-      type = "picture-entity";
+      type = "custom:advanced-camera-card";
       title = "Driveway";
-      entity = "camera.driveway";
-      camera_view = "live";
+      cameras = [
+        {
+          camera_entity = "camera.driveway";
+          live_provider = "go2rtc";
+        }
+      ];
+      dimensions = {
+        aspect_ratio_mode = "static";
+        aspect_ratio = "16:9";
+      };
     }
     {
-      type = "picture-entity";
+      type = "custom:advanced-camera-card";
       title = "Front Door";
-      entity = "camera.front_door";
-      camera_view = "live";
+      cameras = [
+        {
+          camera_entity = "camera.front_door";
+          live_provider = "go2rtc";
+        }
+      ];
+      dimensions = {
+        aspect_ratio_mode = "static";
+        aspect_ratio = "16:9";
+      };
     }
     {
-      type = "picture-entity";
+      type = "custom:advanced-camera-card";
       title = "Back Gate";
-      entity = "camera.back_gate";
-      camera_view = "live";
+      cameras = [
+        {
+          camera_entity = "camera.back_gate";
+          live_provider = "go2rtc";
+        }
+      ];
+      dimensions = {
+        aspect_ratio_mode = "static";
+        aspect_ratio = "16:9";
+      };
     }
     {
       type = "custom:advanced-camera-card";
