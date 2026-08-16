@@ -8,10 +8,14 @@
       type = "vertical-stack";
       cards = [
         {
-          type = "picture-entity";
+          type = "custom:advanced-camera-card";
           title = "Driveway";
-          entity = "camera.driveway";
-          camera_view = "live";
+          cameras = [
+            {
+              camera_entity = "camera.driveway";
+              live_provider = "go2rtc";
+            }
+          ];
         }
         {
           type = "entities";
