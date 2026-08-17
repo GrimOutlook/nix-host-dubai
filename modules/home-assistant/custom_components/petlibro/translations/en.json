@@ -1,0 +1,61 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "{info}"
+      }
+    },
+    "abort": {
+      "already_configured": "PetLibro Feeders is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "menu_options": {
+          "manage_schedules": "Manage feeding times",
+          "assign_collar": "Assign pet collar",
+          "delete_collar": "Delete pet collar"
+        }
+      },
+      "manage_schedules": {
+        "data": {
+          "feeder": "Feeder",
+          "linked": "Keep this feeder linked to others (schedule changes propagate to all linked feeders)"
+        }
+      },
+      "schedule_action": {
+        "description": "Managing feeding times for {feeder}.",
+        "data": {
+          "action": "What do you want to do?",
+          "slot": "Feeding time"
+        }
+      },
+      "schedule_add_edit": {
+        "data": {
+          "time": "Time (HH:MM)",
+          "portions": "Portions",
+          "repeat_day": "Repeat days (7 characters, Mon-Sun, e.g. 1111111 = every day)",
+          "enabled": "Enabled"
+        }
+      },
+      "assign_collar": {
+        "data": {
+          "feeder": "Feeder",
+          "pet_name": "Pet name",
+          "collar_tag": "Collar RFID tag (hex)"
+        }
+      },
+      "delete_collar": {
+        "data": {
+          "feeder": "Feeder",
+          "collar_tag": "Collar RFID tag (hex)"
+        }
+      }
+    },
+    "error": {
+      "max_schedules": "This feeder already has the maximum number of feeding times.",
+      "no_slot_selected": "Select a feeding time first."
+    }
+  }
+}
