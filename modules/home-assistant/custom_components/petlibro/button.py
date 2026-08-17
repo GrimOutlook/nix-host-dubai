@@ -79,7 +79,7 @@ class PetLibroFeedNowButton(PetLibroBaseButton):
 
 
 class PetLibroApplyScheduleButton(PetLibroBaseButton):
-    """Apply schedule button."""
+    """Re-send every feeding time to the device (all channelPlanNum slots)."""
 
     _attr_icon = "mdi:calendar-clock"
 
@@ -89,11 +89,11 @@ class PetLibroApplyScheduleButton(PetLibroBaseButton):
         self._attr_unique_id = f"{device_id}_apply_schedule"
 
     async def async_press(self):
-        await self.coordinator.async_send_feeding_plan_mqtt(self.feeder_name)
+        await self.coordinator.async_send_feeding_plans_mqtt(self.feeder_name)
 
 
 class PetLibroSyncScheduleButton(PetLibroBaseButton):
-    """Sync schedule across all linked feeders button."""
+    """Copy this feeder's full list of feeding times onto all other linked feeders."""
 
     _attr_icon = "mdi:sync"
 
@@ -103,14 +103,7 @@ class PetLibroSyncScheduleButton(PetLibroBaseButton):
         self._attr_unique_id = f"{device_id}_sync_schedule"
 
     async def async_press(self):
-        sched = self.coordinator.schedules.get(self.feeder_name, {})
-        await self.coordinator.async_update_schedule(
-            self.feeder_name,
-            time_str=sched.get("time"),
-            grain_num=sched.get("grain_num"),
-            repeat_day=sched.get("repeat_day"),
-            linked=True,
-        )
+        await self.coordinator.async_sync_schedule_to_linked(self.feeder_name)
 
 
 class PetLibroRefreshSettingsButton(PetLibroBaseButton):

@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import logging
 import time
+import uuid
 
 from homeassistant.components import mqtt
 from homeassistant.core import HomeAssistant, callback
@@ -17,6 +18,7 @@ from .const import (
     CMD_SWITCH_DOOR,
     CMD_UNBIND_PET,
     DOMAIN,
+    MAX_SCHEDULES_PER_FEEDER,
     STORAGE_KEY_PETS,
     STORAGE_KEY_SCHEDULES,
     STORAGE_VERSION,
@@ -44,7 +46,14 @@ class PetLibroCoordinator:
         # Pet registry: { collar_tag_hex: {"pet_name": str, "collar_tag": str, "feeder_id": str} }
         self.pets: dict[str, dict] = {}
 
-        # Schedules: { feeder_name: {"time": "08:30", "grain_num": 1, "repeat_day": "1111111", "enabled": True, "linked": True} }
+        # Schedules: { feeder_name: {"linked": True, "enabled": True, "slots": [
+        #   {"id": "a1b2c3d4", "time": "08:30", "grain_num": 1, "repeat_day": "1111111", "enabled": True},
+        #   ...
+        # ]}}
+        # "enabled" here is a master pause covering every slot; each slot also
+        # has its own "enabled" so individual feeding times can be paused
+        # without affecting the others. "linked" propagates slot add/edit/
+        # delete to every other linked feeder by matching slot position.
         self.schedules: dict[str, dict] = {}
 
         # Runtime live state per feeder_name
@@ -81,16 +90,26 @@ class PetLibroCoordinator:
         if schedule_data and isinstance(schedule_data, dict):
             self.schedules = schedule_data.get("schedules", {})
 
-        # Initialize default schedule for any feeder missing from storage
+        # Initialize a default first feeding time for any feeder missing from
+        # storage, and migrate any pre-multi-schedule flat-dict entries (no
+        # "slots" key) into the new {"linked", "enabled", "slots": [...]} shape.
         for f in self.feeders:
             name = f["name"]
-            if name not in self.schedules:
+            legacy = self.schedules.get(name)
+            if legacy is None or "slots" not in legacy:
+                legacy = legacy or {}
                 self.schedules[name] = {
-                    "time": "08:00",
-                    "grain_num": 1,
-                    "repeat_day": "1111111",
-                    "enabled": True,
-                    "linked": True,
+                    "linked": legacy.get("linked", True),
+                    "enabled": legacy.get("enabled", True),
+                    "slots": [
+                        {
+                            "id": uuid.uuid4().hex[:8],
+                            "time": legacy.get("time", "08:00"),
+                            "grain_num": legacy.get("grain_num", 1),
+                            "repeat_day": legacy.get("repeat_day", "1111111"),
+                            "enabled": True,
+                        }
+                    ],
                 }
 
         # Subscribe to MQTT topics for each feeder
@@ -245,6 +264,123 @@ class PetLibroCoordinator:
             await self.async_publish_cmd(feeder_name, cmd_payload)
         self._notify_listeners()
 
+    def _get_feeder_schedule(self, feeder_name: str) -> dict:
+        if feeder_name not in self.schedules:
+            self.schedules[feeder_name] = {"linked": True, "enabled": True, "slots": []}
+        return self.schedules[feeder_name]
+
+    @staticmethod
+    def _new_slot(time_str: str, grain_num: int, repeat_day: str, enabled: bool) -> dict:
+        return {
+            "id": uuid.uuid4().hex[:8],
+            "time": time_str,
+            "grain_num": grain_num,
+            "repeat_day": repeat_day,
+            "enabled": enabled,
+        }
+
+    async def async_add_schedule_slot(
+        self,
+        feeder_name: str,
+        time_str: str = "08:00",
+        grain_num: int = 1,
+        repeat_day: str = "1111111",
+        enabled: bool = True,
+    ) -> str | None:
+        """Add a new feeding time to a feeder, propagating to linked feeders. Returns the new slot id."""
+        sched = self._get_feeder_schedule(feeder_name)
+        if len(sched["slots"]) >= MAX_SCHEDULES_PER_FEEDER:
+            _LOGGER.error(
+                "%s already has the maximum of %d feeding times", feeder_name, MAX_SCHEDULES_PER_FEEDER
+            )
+            return None
+
+        slot = self._new_slot(time_str, grain_num, repeat_day, enabled)
+        sched["slots"].append(slot)
+
+        target_feeders = [feeder_name]
+        if sched.get("linked", True):
+            for other_name, other_sched in self.schedules.items():
+                if other_name == feeder_name or not other_sched.get("linked", True):
+                    continue
+                if len(other_sched["slots"]) < MAX_SCHEDULES_PER_FEEDER:
+                    other_sched["slots"].append(dict(slot))
+                    target_feeders.append(other_name)
+
+        await self._schedule_store.async_save({"schedules": self.schedules})
+        for f_name in target_feeders:
+            await self.async_send_feeding_plans_mqtt(f_name)
+        self._notify_listeners()
+        return slot["id"]
+
+    async def async_update_schedule_slot(
+        self,
+        feeder_name: str,
+        slot_id: str,
+        time_str: str | None = None,
+        grain_num: int | None = None,
+        repeat_day: str | None = None,
+        enabled: bool | None = None,
+    ):
+        """Update one feeding time by id, propagating the same edit to linked feeders' matching slot position."""
+        sched = self._get_feeder_schedule(feeder_name)
+        slot_index = next((i for i, s in enumerate(sched["slots"]) if s["id"] == slot_id), None)
+        if slot_index is None:
+            _LOGGER.error("Schedule slot %s not found for feeder %s", slot_id, feeder_name)
+            return
+
+        def _apply(slot: dict):
+            if time_str is not None:
+                slot["time"] = time_str
+            if grain_num is not None:
+                slot["grain_num"] = grain_num
+            if repeat_day is not None:
+                slot["repeat_day"] = repeat_day
+            if enabled is not None:
+                slot["enabled"] = enabled
+
+        _apply(sched["slots"][slot_index])
+        target_feeders = [feeder_name]
+
+        if sched.get("linked", True):
+            for other_name, other_sched in self.schedules.items():
+                if other_name == feeder_name or not other_sched.get("linked", True):
+                    continue
+                if slot_index < len(other_sched["slots"]):
+                    _apply(other_sched["slots"][slot_index])
+                    target_feeders.append(other_name)
+
+        await self._schedule_store.async_save({"schedules": self.schedules})
+        for f_name in target_feeders:
+            await self.async_send_feeding_plans_mqtt(f_name)
+        self._notify_listeners()
+
+    async def async_delete_schedule_slot(self, feeder_name: str, slot_id: str):
+        """Remove a feeding time and clear its plan slot on the device (and linked feeders' matching slot)."""
+        sched = self._get_feeder_schedule(feeder_name)
+        slot_index = next((i for i, s in enumerate(sched["slots"]) if s["id"] == slot_id), None)
+        if slot_index is None:
+            return
+
+        del sched["slots"][slot_index]
+        target_feeders = [feeder_name]
+
+        if sched.get("linked", True):
+            for other_name, other_sched in self.schedules.items():
+                if other_name == feeder_name or not other_sched.get("linked", True):
+                    continue
+                if slot_index < len(other_sched["slots"]):
+                    del other_sched["slots"][slot_index]
+                    target_feeders.append(other_name)
+
+        await self._schedule_store.async_save({"schedules": self.schedules})
+        for f_name in target_feeders:
+            # Resync remaining slots, then clear any channelPlanNum left over
+            # from before the deletion (the protocol has no explicit "delete
+            # plan" command, so pausing via skipEndTime is the only way).
+            await self.async_send_feeding_plans_mqtt(f_name, clear_up_to=MAX_SCHEDULES_PER_FEEDER)
+        self._notify_listeners()
+
     async def async_update_schedule(
         self,
         feeder_name: str,
@@ -252,78 +388,96 @@ class PetLibroCoordinator:
         grain_num: int | None = None,
         repeat_day: str | None = None,
         enabled: bool | None = None,
-        linked: bool | None = None,
+        slot_index: int = 0,
     ):
-        """Update feeder schedule parameters and propagate to linked feeders if linked is True."""
-        if feeder_name not in self.schedules:
-            self.schedules[feeder_name] = {
-                "time": "08:00",
-                "grain_num": 1,
-                "repeat_day": "1111111",
-                "enabled": True,
-                "linked": True,
-            }
+        """Update a feeder's Nth feeding time (default: the first/primary one).
 
-        sched = self.schedules[feeder_name]
-        if time_str is not None:
-            sched["time"] = time_str
-        if grain_num is not None:
-            sched["grain_num"] = grain_num
-        if repeat_day is not None:
-            sched["repeat_day"] = repeat_day
-        if enabled is not None:
-            sched["enabled"] = enabled
-        if linked is not None:
-            sched["linked"] = linked
+        Kept for the standalone quick-edit Time/Number/Text entities and the
+        set_schedule service, which only ever touch one slot at a time. Use
+        async_add_schedule_slot / async_update_schedule_slot /
+        async_delete_schedule_slot to manage the full list of feeding times.
+        """
+        sched = self._get_feeder_schedule(feeder_name)
+        while len(sched["slots"]) <= slot_index:
+            sched["slots"].append(self._new_slot("08:00", 1, "1111111", True))
 
-        target_feeders = [feeder_name]
-
-        # If schedule linking is enabled for this feeder, propagate schedule settings to all other linked feeders!
-        if sched.get("linked", True):
-            for other_name, other_sched in self.schedules.items():
-                if other_name != feeder_name and other_sched.get("linked", True):
-                    if time_str is not None:
-                        other_sched["time"] = time_str
-                    if grain_num is not None:
-                        other_sched["grain_num"] = grain_num
-                    if repeat_day is not None:
-                        other_sched["repeat_day"] = repeat_day
-                    target_feeders.append(other_name)
-
-        await self._schedule_store.async_save({"schedules": self.schedules})
-
-        # Send updated MQTT feeding plan to all target feeders
-        for f_name in target_feeders:
-            await self.async_send_feeding_plan_mqtt(f_name)
-
-        self._notify_listeners()
+        slot_id = sched["slots"][slot_index]["id"]
+        await self.async_update_schedule_slot(
+            feeder_name, slot_id, time_str=time_str, grain_num=grain_num, repeat_day=repeat_day, enabled=enabled
+        )
 
     async def async_toggle_schedule_enabled(self, feeder_name: str, enabled: bool):
-        """Enable or disable schedule dispensing for a feeder."""
-        await self.async_update_schedule(feeder_name, enabled=enabled)
+        """Master pause/resume covering every feeding time on a feeder."""
+        sched = self._get_feeder_schedule(feeder_name)
+        sched["enabled"] = enabled
+        await self._schedule_store.async_save({"schedules": self.schedules})
+        await self.async_send_feeding_plans_mqtt(feeder_name)
+        self._notify_listeners()
 
-    async def async_send_feeding_plan_mqtt(self, feeder_name: str):
-        """Dispatch DEVICE_FEEDING_PLAN_SERVICE over MQTT for a feeder."""
+    async def async_set_schedule_linked(self, feeder_name: str, linked: bool):
+        """Enable or disable schedule-change propagation to other linked feeders."""
+        sched = self._get_feeder_schedule(feeder_name)
+        sched["linked"] = linked
+        await self._schedule_store.async_save({"schedules": self.schedules})
+        self._notify_listeners()
+
+    async def async_sync_schedule_to_linked(self, feeder_name: str):
+        """Copy this feeder's full list of feeding times onto every other linked feeder."""
+        sched = self._get_feeder_schedule(feeder_name)
+        sched["linked"] = True
+        target_feeders = [feeder_name]
+
+        for other_name, other_sched in self.schedules.items():
+            if other_name == feeder_name or not other_sched.get("linked", True):
+                continue
+            other_sched["slots"] = [dict(s) for s in sched["slots"]]
+            target_feeders.append(other_name)
+
+        await self._schedule_store.async_save({"schedules": self.schedules})
+        for f_name in target_feeders:
+            await self.async_send_feeding_plans_mqtt(f_name, clear_up_to=MAX_SCHEDULES_PER_FEEDER)
+        self._notify_listeners()
+
+    async def async_send_feeding_plans_mqtt(self, feeder_name: str, clear_up_to: int | None = None):
+        """Dispatch DEVICE_FEEDING_PLAN_SERVICE for every feeding time, renumbering channelPlanNum from list order."""
         sched = self.schedules.get(feeder_name, {})
-        is_enabled = sched.get("enabled", True)
+        master_enabled = sched.get("enabled", True)
+        slots = sched.get("slots", [])
 
-        # Native protocol disabling via skipEndTime (Option 1):
-        # When enabled: skipEndTime = 0 (plan executes normally).
-        # When disabled: skipEndTime = 2147483647 (plan paused until far-future timestamp).
-        skip_end_time = 0 if is_enabled else 2147483647
+        for i, slot in enumerate(slots, start=1):
+            # Native protocol disabling via skipEndTime (Option 1):
+            # When enabled: skipEndTime = 0 (plan executes normally).
+            # When disabled: skipEndTime = 2147483647 (plan paused until far-future timestamp).
+            is_enabled = master_enabled and slot.get("enabled", True)
+            skip_end_time = 0 if is_enabled else 2147483647
 
-        cmd_payload = {
-            "cmd": CMD_FEEDING_PLAN,
-            "channelPlanNum": 1,
-            "planId": "ha_plan",
-            "grainNum": sched.get("grain_num", 1),
-            "executionTime": sched.get("time", "08:00"),
-            "repeatDay": sched.get("repeat_day", "1111111"),
-            "audioTimes": 2,
-            "syncTime": int(time.time()),
-            "skipEndTime": skip_end_time,
-        }
-        await self.async_publish_cmd(feeder_name, cmd_payload)
+            cmd_payload = {
+                "cmd": CMD_FEEDING_PLAN,
+                "channelPlanNum": i,
+                "planId": f"ha_plan_{i}",
+                "grainNum": slot.get("grain_num", 1),
+                "executionTime": slot.get("time", "08:00"),
+                "repeatDay": slot.get("repeat_day", "1111111"),
+                "audioTimes": 2,
+                "syncTime": int(time.time()),
+                "skipEndTime": skip_end_time,
+            }
+            await self.async_publish_cmd(feeder_name, cmd_payload)
+
+        if clear_up_to:
+            for i in range(len(slots) + 1, clear_up_to + 1):
+                cmd_payload = {
+                    "cmd": CMD_FEEDING_PLAN,
+                    "channelPlanNum": i,
+                    "planId": f"ha_plan_{i}",
+                    "grainNum": 1,
+                    "executionTime": "00:00",
+                    "repeatDay": "0000000",
+                    "audioTimes": 0,
+                    "syncTime": int(time.time()),
+                    "skipEndTime": 2147483647,
+                }
+                await self.async_publish_cmd(feeder_name, cmd_payload)
 
     async def async_manual_feed(self, feeder_name: str, grain_num: int):
         """Dispense food immediately via MANUAL_FEEDING_SERVICE."""

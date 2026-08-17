@@ -10,7 +10,10 @@ from homeassistant.helpers import config_validation as cv
 from .const import (
     DEFAULT_FEEDERS,
     DOMAIN,
+    MAX_SCHEDULES_PER_FEEDER,
+    SERVICE_ADD_SCHEDULE,
     SERVICE_ASSIGN_COLLAR,
+    SERVICE_DELETE_SCHEDULE,
     SERVICE_FEED,
     SERVICE_SET_SCHEDULE,
     SERVICE_SET_SCHEDULE_ENABLED,
@@ -61,32 +64,48 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         await coordinator.async_assign_collar(feeder_id, pet_name, collar_tag)
 
     async def handle_set_schedule(call: ServiceCall):
+        """Update a feeder's Nth feeding time (slot 0 = the first/primary one)."""
         feeder_id = call.data["feeder"]
         time_str = call.data.get("time")
         portions = call.data.get("portions")
         repeat_day = call.data.get("repeat_day")
         enabled = call.data.get("enabled")
         linked = call.data.get("linked")
-        await coordinator.async_update_schedule(
+        slot = call.data.get("slot", 0)
+        if linked is not None:
+            await coordinator.async_set_schedule_linked(feeder_id, linked)
+        if any(v is not None for v in (time_str, portions, repeat_day, enabled)):
+            await coordinator.async_update_schedule(
+                feeder_id,
+                time_str=time_str,
+                grain_num=portions,
+                repeat_day=repeat_day,
+                enabled=enabled,
+                slot_index=slot,
+            )
+
+    async def handle_add_schedule(call: ServiceCall):
+        """Add a new feeding time to a feeder."""
+        feeder_id = call.data["feeder"]
+        await coordinator.async_add_schedule_slot(
             feeder_id,
-            time_str=time_str,
-            grain_num=portions,
-            repeat_day=repeat_day,
-            enabled=enabled,
-            linked=linked,
+            time_str=call.data.get("time", "08:00"),
+            grain_num=call.data.get("portions", 1),
+            repeat_day=call.data.get("repeat_day", "1111111"),
+            enabled=call.data.get("enabled", True),
         )
+
+    async def handle_delete_schedule(call: ServiceCall):
+        """Remove a feeding time from a feeder by its position in the list."""
+        feeder_id = call.data["feeder"]
+        slot = call.data["slot"]
+        slots = coordinator.schedules.get(feeder_id, {}).get("slots", [])
+        if 0 <= slot < len(slots):
+            await coordinator.async_delete_schedule_slot(feeder_id, slots[slot]["id"])
 
     async def handle_sync_schedules(call: ServiceCall):
         source_feeder = call.data["source_feeder"]
-        sched = coordinator.schedules.get(source_feeder)
-        if sched:
-            await coordinator.async_update_schedule(
-                source_feeder,
-                time_str=sched.get("time"),
-                grain_num=sched.get("grain_num"),
-                repeat_day=sched.get("repeat_day"),
-                linked=True,
-            )
+        await coordinator.async_sync_schedule_to_linked(source_feeder)
 
     async def handle_set_schedule_enabled(call: ServiceCall):
         feeder_id = call.data["feeder"]
@@ -120,11 +139,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         handle_set_schedule,
         schema=vol.Schema({
             vol.Required("feeder"): cv.string,
+            vol.Optional("slot", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_SCHEDULES_PER_FEEDER - 1)),
             vol.Optional("time"): cv.string,
             vol.Optional("portions"): cv.positive_int,
             vol.Optional("repeat_day"): cv.string,
             vol.Optional("enabled"): cv.boolean,
             vol.Optional("linked"): cv.boolean,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ADD_SCHEDULE,
+        handle_add_schedule,
+        schema=vol.Schema({
+            vol.Required("feeder"): cv.string,
+            vol.Optional("time", default="08:00"): cv.string,
+            vol.Optional("portions", default=1): cv.positive_int,
+            vol.Optional("repeat_day", default="1111111"): cv.string,
+            vol.Optional("enabled", default=True): cv.boolean,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_DELETE_SCHEDULE,
+        handle_delete_schedule,
+        schema=vol.Schema({
+            vol.Required("feeder"): cv.string,
+            vol.Required("slot"): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_SCHEDULES_PER_FEEDER - 1)),
         }),
     )
 

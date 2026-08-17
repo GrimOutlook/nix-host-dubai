@@ -19,7 +19,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 
 class PetLibroScheduleRepeatDaysText(TextEntity):
-    """Text entity to configure 7-char Mon-Sun schedule repeat day bitmask."""
+    """Quick-edit 7-char Mon-Sun repeat-day bitmask for a feeder's first/primary feeding time.
+
+    A feeder can have up to MAX_SCHEDULES_PER_FEEDER feeding times; manage
+    the full list via Settings > Devices & Services > Configure.
+    """
 
     _attr_icon = "mdi:calendar-week"
     _attr_pattern = "^[01]{7}$"
@@ -50,7 +54,8 @@ class PetLibroScheduleRepeatDaysText(TextEntity):
     @property
     def native_value(self) -> str:
         sched = self.coordinator.schedules.get(self.feeder_name, {})
-        return sched.get("repeat_day", "1111111")
+        slots = sched.get("slots", [])
+        return slots[0].get("repeat_day", "1111111") if slots else "1111111"
 
     async def async_set_value(self, value: str) -> None:
         """Update repeat day bitmask and propagate if schedule linking is enabled."""

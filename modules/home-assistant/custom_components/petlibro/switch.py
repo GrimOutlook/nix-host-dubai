@@ -93,11 +93,11 @@ class PetLibroScheduleLinkedSwitch(PetLibroBaseSwitch):
 
     async def async_turn_on(self, **kwargs):
         """Enable schedule linking for this feeder."""
-        await self.coordinator.async_update_schedule(self.feeder_name, linked=True)
+        await self.coordinator.async_set_schedule_linked(self.feeder_name, True)
 
     async def async_turn_off(self, **kwargs):
         """Disable schedule linking for this feeder."""
-        await self.coordinator.async_update_schedule(self.feeder_name, linked=False)
+        await self.coordinator.async_set_schedule_linked(self.feeder_name, False)
 
 
 class PetLibroAttrSwitch(PetLibroBaseSwitch):

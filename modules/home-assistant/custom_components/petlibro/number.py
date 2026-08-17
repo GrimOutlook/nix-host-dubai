@@ -48,7 +48,11 @@ class PetLibroBaseNumber(NumberEntity):
 
 
 class PetLibroSchedulePortionsNumber(PetLibroBaseNumber):
-    """Number entity to set scheduled portion count."""
+    """Quick-edit portion count for a feeder's first/primary feeding time.
+
+    A feeder can have up to MAX_SCHEDULES_PER_FEEDER feeding times; manage
+    the full list via Settings > Devices & Services > Configure.
+    """
 
     _attr_native_min_value = 1
     _attr_native_max_value = 10
@@ -64,7 +68,8 @@ class PetLibroSchedulePortionsNumber(PetLibroBaseNumber):
     @property
     def native_value(self) -> float:
         sched = self.coordinator.schedules.get(self.feeder_name, {})
-        return float(sched.get("grain_num", 1))
+        slots = sched.get("slots", [])
+        return float(slots[0].get("grain_num", 1)) if slots else 1.0
 
     async def async_set_native_value(self, value: float):
         """Update portion count and propagate if schedule linking is enabled."""

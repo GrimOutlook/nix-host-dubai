@@ -36,13 +36,19 @@ assign_collar:
 
 set_schedule:
   name: Set Feeding Schedule
-  description: Updates feeding schedule time, portion count, repeat days, and sync options.
+  description: Updates one of a feeder's feeding times (by position), plus repeat days and sync options. Use add_schedule/delete_schedule to grow or shrink the list.
   fields:
     feeder:
       name: Feeder Name
       description: Target feeder name.
       required: true
       example: feed-willow
+    slot:
+      name: Feeding Time Slot
+      description: 0-based position of the feeding time to update (0 = first/primary). Defaults to 0.
+      required: false
+      default: 0
+      example: 1
     time:
       name: Schedule Time
       description: Execution time in HH:MM format.
@@ -68,6 +74,55 @@ set_schedule:
       description: Set to true to automatically propagate schedule changes to other linked feeders.
       required: false
       example: true
+
+add_schedule:
+  name: Add Feeding Time
+  description: Adds a new feeding time to a feeder (up to 10), propagated to linked feeders if schedule linking is enabled.
+  fields:
+    feeder:
+      name: Feeder Name
+      description: Target feeder name.
+      required: true
+      example: feed-willow
+    time:
+      name: Schedule Time
+      description: Execution time in HH:MM format.
+      required: false
+      default: "08:00"
+      example: "17:30"
+    portions:
+      name: Portions
+      description: Number of portions to dispense at this time.
+      required: false
+      default: 1
+      example: 2
+    repeat_day:
+      name: Repeat Day Bitmask
+      description: 7-character string for Mon-Sun (e.g. 1111111 = everyday).
+      required: false
+      default: "1111111"
+      example: "1111111"
+    enabled:
+      name: Enabled
+      description: Set to false to add the feeding time paused.
+      required: false
+      default: true
+      example: true
+
+delete_schedule:
+  name: Delete Feeding Time
+  description: Removes a feeding time from a feeder by its position in the list, propagated to linked feeders if schedule linking is enabled.
+  fields:
+    feeder:
+      name: Feeder Name
+      description: Target feeder name.
+      required: true
+      example: feed-willow
+    slot:
+      name: Feeding Time Slot
+      description: 0-based position of the feeding time to remove.
+      required: true
+      example: 1
 
 sync_schedules:
   name: Sync Schedules Across Feeders

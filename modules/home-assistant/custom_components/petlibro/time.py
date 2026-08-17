@@ -20,7 +20,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 
 class PetLibroScheduleTime(TimeEntity):
-    """Time entity to select scheduled feeding time."""
+    """Quick-edit time entity for a feeder's first/primary feeding time.
+
+    A feeder can have up to MAX_SCHEDULES_PER_FEEDER feeding times; manage
+    the full list via Settings > Devices & Services > Configure.
+    """
 
     _attr_icon = "mdi:clock-outline"
 
@@ -50,7 +54,8 @@ class PetLibroScheduleTime(TimeEntity):
     @property
     def native_value(self) -> dt_time | None:
         sched = self.coordinator.schedules.get(self.feeder_name, {})
-        time_str = sched.get("time", "08:00")
+        slots = sched.get("slots", [])
+        time_str = slots[0].get("time", "08:00") if slots else "08:00"
         try:
             parts = time_str.split(":")
             return dt_time(int(parts[0]), int(parts[1]))
