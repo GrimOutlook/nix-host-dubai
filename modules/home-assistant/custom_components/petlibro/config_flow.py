@@ -34,14 +34,16 @@ class PetLibroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
-        return PetLibroOptionsFlowHandler(config_entry)
+        return PetLibroOptionsFlowHandler()
 
 
 class PetLibroOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle PetLibro options sub-menu flow (Settings > Devices & Services > Configure)."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry):
-        self.config_entry = config_entry
+    def __init__(self):
+        # self.config_entry is a read-only property on the base OptionsFlow
+        # (derived from self.handler once the flow manager initializes it) --
+        # it must not be assigned here.
         self._selected_action = None
         self._selected_feeder = None
         self._selected_slot_id = None
