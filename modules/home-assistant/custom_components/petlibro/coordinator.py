@@ -480,9 +480,16 @@ class PetLibroCoordinator:
                 await self.async_publish_cmd(feeder_name, cmd_payload)
 
     async def async_manual_feed(self, feeder_name: str, grain_num: int):
-        """Dispense food immediately via MANUAL_FEEDING_SERVICE."""
+        """Dispense food immediately via MANUAL_FEEDING_SERVICE.
+
+        msgId is required by the firmware here (unlike most other commands,
+        where it's optional) -- omitting it silently returns code:2000
+        (no food dispensed) instead of an error. See feeder-jailbreak
+        FINDINGS.md 2026-08-13.
+        """
         cmd_payload = {
             "cmd": CMD_MANUAL_FEEDING,
+            "msgId": uuid.uuid4().hex,
             "grainNum": max(1, int(grain_num)),
         }
         await self.async_publish_cmd(feeder_name, cmd_payload)
