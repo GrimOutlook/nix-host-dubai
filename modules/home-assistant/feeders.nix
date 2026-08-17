@@ -98,6 +98,20 @@ let
         device_class = "problem";
       }
     ];
+  # Only the sensor whose value is always fresh off the wire lives here.
+  # The rest (Last Fed and friends, below feederButtons) used to be MQTT
+  # sensors too, each holding its value between real events by having its
+  # value_template render `this.state` when the incoming message wasn't
+  # the one it cares about. That self-reference needs HA to restore
+  # `this` across a restart, but MQTT platform entities go `unavailable`
+  # the instant HA's MQTT client disconnects during shutdown, and
+  # RestoreEntity won't resurrect a real value from an
+  # `unavailable`/`unknown` snapshot. Confirmed against
+  # home-assistant_v2.db's state history: every HA restart (so every
+  # dubai redeploy) wrote the real value, then `unavailable`, then
+  # `unknown`, all at the exact restart second -- wiping these back to
+  # unknown until the device's next matching event, which can be hours
+  # later for something like a finished feed.
   feederSensors =
     { name, deviceId }:
     [
@@ -110,192 +124,6 @@ let
         device_class = "signal_strength";
         unit_of_measurement = "dBm";
         state_class = "measurement";
-        entity_category = "diagnostic";
-      }
-      {
-        name = "Last Fed";
-        unique_id = "${deviceId}_last_fed";
-        device = feederDevice { inherit name deviceId; };
-        state_topic = feederTopic deviceId "event/post";
-        # The device doesn't put its own wall-clock time on this event, so
-        # this is "when HA saw the finish" rather than "when the device
-        # says it finished" -- close enough given events arrive within a
-        # second or two of the real thing. Same caveat applies to every
-        # other now().isoformat()-based sensor below.
-        value_template = ''
-          {%- if value_json.cmd == 'GRAIN_OUTPUT_EVENT' and value_json.finished -%}
-            {{- now().isoformat() -}}
-          {%- else -%}
-            {{- this.state if this is defined else 'unknown' -}}
-          {%- endif -%}
-        '';
-        device_class = "timestamp";
-      }
-      {
-        # PET_IDENTIFY_EVENT fires when an RFID collar comes into range.
-        # State is the raw tag, not a pet name -- there's no memberId ->
-        # pet-name mapping anywhere in this config (ADD_OR_UPDATE_RFID_SERVICE,
-        # which would set one, has never been sent), so calibrationTag is
-        # the only thing guaranteed to mean something.
-        name = "Pet Last Scanned";
-        unique_id = "${deviceId}_last_scanned";
-        device = feederDevice { inherit name deviceId; };
-        state_topic = feederTopic deviceId "event/post";
-        value_template = ''
-          {%- if value_json.cmd == 'PET_IDENTIFY_EVENT' -%}
-            {{- value_json.calibrationTag -}}
-          {%- else -%}
-            {{- this.state if this is defined else 'unknown' -}}
-          {%- endif -%}
-        '';
-        json_attributes_topic = feederTopic deviceId "event/post";
-        json_attributes_template = ''
-          {%- if value_json.cmd == 'PET_IDENTIFY_EVENT' -%}
-            {{- {'member_id': value_json.memberId} | tojson -}}
-          {%- elif this is defined and 'member_id' in this.attributes -%}
-            {{- {'member_id': this.attributes.member_id} | tojson -}}
-          {%- else -%}
-            {{- {} | tojson -}}
-          {%- endif -%}
-        '';
-        icon = "mdi:paw";
-      }
-      {
-        # MACHINE_INFRARED_EVENT: the bowl's break-beam/presence sensor.
-        # FINDINGS.md only confirms *that* this fires, not any field names
-        # inside it (unlike the events above, which were seen with full
-        # payloads) -- so this reports "when it last fired" rather than
-        # guessing at a boolean field that isn't documented anywhere.
-        name = "Bowl Activity";
-        unique_id = "${deviceId}_bowl_activity";
-        device = feederDevice { inherit name deviceId; };
-        state_topic = feederTopic deviceId "event/post";
-        value_template = ''
-          {%- if value_json.cmd == 'MACHINE_INFRARED_EVENT' -%}
-            {{- now().isoformat() -}}
-          {%- else -%}
-            {{- this.state if this is defined else 'unknown' -}}
-          {%- endif -%}
-        '';
-        device_class = "timestamp";
-        entity_category = "diagnostic";
-      }
-      {
-        # ERROR_EVENT covers everything in mqtt_command_reference.md's
-        # "Common Error/Status Strings" that isn't the feed jam above --
-        # LOW_FOOD, LOW_BATTERY, BARN_OPEN_DOOR_ERROR/BARN_CLOSE_DOOR_ERROR,
-        # OFFLINE/NETWORK_*. One generic "last error" sensor instead of a
-        # binary_sensor per condition: none of these have a documented
-        # clear/resolved counterpart event the way the feed jam does, so a
-        # binary_sensor here could only ever latch on and never honestly
-        # turn back off. This just reports the most recent one instead of
-        # claiming to know current state.
-        name = "Last Error";
-        unique_id = "${deviceId}_last_error";
-        device = feederDevice { inherit name deviceId; };
-        state_topic = feederTopic deviceId "event/post";
-        value_template = ''
-          {%- if value_json.cmd == 'ERROR_EVENT' -%}
-            {{- value_json.errorMsg -}}
-          {%- else -%}
-            {{- this.state if this is defined else 'unknown' -}}
-          {%- endif -%}
-        '';
-        json_attributes_topic = feederTopic deviceId "event/post";
-        json_attributes_template = ''
-          {%- if value_json.cmd == 'ERROR_EVENT' -%}
-            {{- {'error_code': value_json.errorCode, 'at': now().isoformat()} | tojson -}}
-          {%- elif this is defined and 'error_code' in this.attributes -%}
-            {{- {'error_code': this.attributes.error_code, 'at': this.attributes.at} | tojson -}}
-          {%- else -%}
-            {{- {} | tojson -}}
-          {%- endif -%}
-        '';
-        icon = "mdi:alert";
-        entity_category = "diagnostic";
-      }
-      {
-        # DEVICE_START_EVENT fires once per boot -- useful mainly to
-        # confirm an unexpected reboot happened at all (restartReason,
-        # powerCycle) rather than anything ongoing.
-        name = "Last Boot";
-        unique_id = "${deviceId}_last_boot";
-        device = feederDevice { inherit name deviceId; };
-        state_topic = feederTopic deviceId "event/post";
-        value_template = ''
-          {%- if value_json.cmd == 'DEVICE_START_EVENT' -%}
-            {{- now().isoformat() -}}
-          {%- else -%}
-            {{- this.state if this is defined else 'unknown' -}}
-          {%- endif -%}
-        '';
-        json_attributes_topic = feederTopic deviceId "event/post";
-        json_attributes_template = ''
-          {%- if value_json.cmd == 'DEVICE_START_EVENT' -%}
-            {{- {
-              'hardware_version': value_json.hardwareVersion,
-              'software_version': value_json.softwareVersion,
-              'power_cycle': value_json.powerCycle,
-              'restart_reason': value_json.restartReason,
-            } | tojson -}}
-          {%- elif this is defined and 'hardware_version' in this.attributes -%}
-            {{- {
-              'hardware_version': this.attributes.hardware_version,
-              'software_version': this.attributes.software_version,
-              'power_cycle': this.attributes.power_cycle,
-              'restart_reason': this.attributes.restart_reason,
-            } | tojson -}}
-          {%- else -%}
-            {{- {} | tojson -}}
-          {%- endif -%}
-        '';
-        device_class = "timestamp";
-        entity_category = "diagnostic";
-      }
-      {
-        # Catch-all for ATTR_GET_SERVICE/DEVICE_PROPERTIES_SERVICE responses
-        # (both land on service/post, the "post" counterpart of the
-        # service/sub commands below) -- unlike event/post's fixed set of
-        # event kinds, these two return whatever fields the firmware
-        # decides to report, which isn't practical to pick apart field by
-        # field in Nix. State is just the ack code; the full response body
-        # is in the state attribute.
-        name = "Last Service Response";
-        unique_id = "${deviceId}_last_service_response";
-        device = feederDevice { inherit name deviceId; };
-        state_topic = feederTopic deviceId "service/post";
-        value_template = "{{ value_json.code if (value_json.code is defined) else (this.state if this is defined else 'unknown') }}";
-        json_attributes_topic = feederTopic deviceId "service/post";
-        json_attributes_template = "{{ value_json | tojson if (value_json is defined and value_json) else (this.attributes | tojson if this is defined else {} | tojson) }}";
-        icon = "mdi:message-reply-text";
-        entity_category = "diagnostic";
-      }
-      {
-        # Response to TRIGGER_DEVICE_LOG_REPORT_SERVICE (button below) --
-        # DEVICE_LOG_REPORT_EVENT on event/post, structured diagnostic data
-        # (DNS servers, connection latency per FINDINGS.md). Same
-        # whole-payload-as-attributes approach as Last Service Response
-        # above, for the same reason (undocumented field set).
-        name = "Last Diagnostic Log";
-        unique_id = "${deviceId}_last_diagnostic_log";
-        device = feederDevice { inherit name deviceId; };
-        state_topic = feederTopic deviceId "event/post";
-        value_template = ''
-          {%- if value_json.cmd == 'DEVICE_LOG_REPORT_EVENT' -%}
-            {{- now().isoformat() -}}
-          {%- else -%}
-            {{- this.state if this is defined else 'unknown' -}}
-          {%- endif -%}
-        '';
-        json_attributes_topic = feederTopic deviceId "event/post";
-        json_attributes_template = ''
-          {%- if value_json.cmd == 'DEVICE_LOG_REPORT_EVENT' -%}
-            {{- value_json | tojson -}}
-          {%- else -%}
-            {{- this.attributes | tojson if this is defined else {} | tojson -}}
-          {%- endif -%}
-        '';
-        device_class = "timestamp";
         entity_category = "diagnostic";
       }
     ];
@@ -699,11 +527,252 @@ let
         entity_category = "diagnostic";
       }
     ];
+  # Trigger-based template sensors (see feederSensors above for why these
+  # aren't plain MQTT sensors): a `template:` sensor's own availability
+  # isn't tied to the MQTT connection, so `this.state`/`this.attributes`
+  # survive an HA restart intact instead of getting wiped by the
+  # unavailable-on-disconnect + no-restore-from-unavailable combination.
+  # `default_entity_id` pins each one to the exact entity_id the old MQTT
+  # sensor used, so the Pets dashboard (lovelace/pets.nix) and the low-food
+  # automation (automations.nix), both of which hardcode these entity_ids,
+  # don't need to change.
+  feederTriggerSensors =
+    { name, deviceId }:
+    let
+      device = feederDevice { inherit name deviceId; };
+      key = feederKey name;
+    in
+    [
+      {
+        trigger = [
+          {
+            platform = "mqtt";
+            topic = feederTopic deviceId "event/post";
+          }
+        ];
+        sensor = [
+          {
+            # The device doesn't put its own wall-clock time on this event,
+            # so this is "when HA saw the finish" rather than "when the
+            # device says it finished" -- close enough given events arrive
+            # within a second or two of the real thing. Same caveat applies
+            # to every other now().isoformat()-based sensor below.
+            name = "Last Fed";
+            unique_id = "${deviceId}_last_fed";
+            default_entity_id = "sensor.${key}_last_fed";
+            inherit device;
+            state = ''
+              {%- if trigger.payload_json.cmd == 'GRAIN_OUTPUT_EVENT' and trigger.payload_json.finished -%}
+                {{- now().isoformat() -}}
+              {%- else -%}
+                {{- this.state -}}
+              {%- endif -%}
+            '';
+            device_class = "timestamp";
+          }
+          {
+            # PET_IDENTIFY_EVENT fires when an RFID collar comes into range.
+            # State is the raw tag, not a pet name -- there's no memberId ->
+            # pet-name mapping anywhere in this config (ADD_OR_UPDATE_RFID_SERVICE,
+            # which would set one, has never been sent), so calibrationTag is
+            # the only thing guaranteed to mean something.
+            name = "Pet Last Scanned";
+            unique_id = "${deviceId}_last_scanned";
+            default_entity_id = "sensor.${key}_pet_last_scanned";
+            inherit device;
+            state = ''
+              {%- if trigger.payload_json.cmd == 'PET_IDENTIFY_EVENT' -%}
+                {{- trigger.payload_json.calibrationTag -}}
+              {%- else -%}
+                {{- this.state -}}
+              {%- endif -%}
+            '';
+            attributes = {
+              member_id = ''
+                {%- if trigger.payload_json.cmd == 'PET_IDENTIFY_EVENT' -%}
+                  {{- trigger.payload_json.memberId -}}
+                {%- else -%}
+                  {{- this.attributes.member_id | default("") -}}
+                {%- endif -%}
+              '';
+            };
+            icon = "mdi:paw";
+          }
+          {
+            # MACHINE_INFRARED_EVENT: the bowl's break-beam/presence sensor.
+            # FINDINGS.md only confirms *that* this fires, not any field names
+            # inside it (unlike the events above, which were seen with full
+            # payloads) -- so this reports "when it last fired" rather than
+            # guessing at a boolean field that isn't documented anywhere.
+            name = "Bowl Activity";
+            unique_id = "${deviceId}_bowl_activity";
+            default_entity_id = "sensor.${key}_bowl_activity";
+            inherit device;
+            state = ''
+              {%- if trigger.payload_json.cmd == 'MACHINE_INFRARED_EVENT' -%}
+                {{- now().isoformat() -}}
+              {%- else -%}
+                {{- this.state -}}
+              {%- endif -%}
+            '';
+            device_class = "timestamp";
+            entity_category = "diagnostic";
+          }
+          {
+            # ERROR_EVENT covers everything in mqtt_command_reference.md's
+            # "Common Error/Status Strings" that isn't the feed jam above --
+            # LOW_FOOD, LOW_BATTERY, BARN_OPEN_DOOR_ERROR/BARN_CLOSE_DOOR_ERROR,
+            # OFFLINE/NETWORK_*. One generic "last error" sensor instead of a
+            # binary_sensor per condition: none of these have a documented
+            # clear/resolved counterpart event the way the feed jam does, so a
+            # binary_sensor here could only ever latch on and never honestly
+            # turn back off. This just reports the most recent one instead of
+            # claiming to know current state.
+            name = "Last Error";
+            unique_id = "${deviceId}_last_error";
+            default_entity_id = "sensor.${key}_last_error";
+            inherit device;
+            state = ''
+              {%- if trigger.payload_json.cmd == 'ERROR_EVENT' -%}
+                {{- trigger.payload_json.errorMsg -}}
+              {%- else -%}
+                {{- this.state -}}
+              {%- endif -%}
+            '';
+            attributes = {
+              error_code = ''
+                {%- if trigger.payload_json.cmd == 'ERROR_EVENT' -%}
+                  {{- trigger.payload_json.errorCode -}}
+                {%- else -%}
+                  {{- this.attributes.error_code | default("") -}}
+                {%- endif -%}
+              '';
+              at = ''
+                {%- if trigger.payload_json.cmd == 'ERROR_EVENT' -%}
+                  {{- now().isoformat() -}}
+                {%- else -%}
+                  {{- this.attributes.at | default("") -}}
+                {%- endif -%}
+              '';
+            };
+            icon = "mdi:alert";
+            entity_category = "diagnostic";
+          }
+          {
+            # DEVICE_START_EVENT fires once per boot -- useful mainly to
+            # confirm an unexpected reboot happened at all (restartReason,
+            # powerCycle) rather than anything ongoing.
+            name = "Last Boot";
+            unique_id = "${deviceId}_last_boot";
+            default_entity_id = "sensor.${key}_last_boot";
+            inherit device;
+            state = ''
+              {%- if trigger.payload_json.cmd == 'DEVICE_START_EVENT' -%}
+                {{- now().isoformat() -}}
+              {%- else -%}
+                {{- this.state -}}
+              {%- endif -%}
+            '';
+            attributes = {
+              hardware_version = ''
+                {%- if trigger.payload_json.cmd == 'DEVICE_START_EVENT' -%}
+                  {{- trigger.payload_json.hardwareVersion -}}
+                {%- else -%}
+                  {{- this.attributes.hardware_version | default("") -}}
+                {%- endif -%}
+              '';
+              software_version = ''
+                {%- if trigger.payload_json.cmd == 'DEVICE_START_EVENT' -%}
+                  {{- trigger.payload_json.softwareVersion -}}
+                {%- else -%}
+                  {{- this.attributes.software_version | default("") -}}
+                {%- endif -%}
+              '';
+              power_cycle = ''
+                {%- if trigger.payload_json.cmd == 'DEVICE_START_EVENT' -%}
+                  {{- trigger.payload_json.powerCycle -}}
+                {%- else -%}
+                  {{- this.attributes.power_cycle | default("") -}}
+                {%- endif -%}
+              '';
+              restart_reason = ''
+                {%- if trigger.payload_json.cmd == 'DEVICE_START_EVENT' -%}
+                  {{- trigger.payload_json.restartReason -}}
+                {%- else -%}
+                  {{- this.attributes.restart_reason | default("") -}}
+                {%- endif -%}
+              '';
+            };
+            device_class = "timestamp";
+            entity_category = "diagnostic";
+          }
+          {
+            # Response to TRIGGER_DEVICE_LOG_REPORT_SERVICE (button above) --
+            # DEVICE_LOG_REPORT_EVENT on event/post, structured diagnostic data
+            # (DNS servers, connection latency per FINDINGS.md). Same
+            # whole-payload-as-one-attribute approach as Last Service Response
+            # below, for the same reason (undocumented field set).
+            name = "Last Diagnostic Log";
+            unique_id = "${deviceId}_last_diagnostic_log";
+            default_entity_id = "sensor.${key}_last_diagnostic_log";
+            inherit device;
+            state = ''
+              {%- if trigger.payload_json.cmd == 'DEVICE_LOG_REPORT_EVENT' -%}
+                {{- now().isoformat() -}}
+              {%- else -%}
+                {{- this.state -}}
+              {%- endif -%}
+            '';
+            attributes = {
+              log = ''
+                {%- if trigger.payload_json.cmd == 'DEVICE_LOG_REPORT_EVENT' -%}
+                  {{- trigger.payload_json -}}
+                {%- else -%}
+                  {{- this.attributes.log | default({}) -}}
+                {%- endif -%}
+              '';
+            };
+            device_class = "timestamp";
+            entity_category = "diagnostic";
+          }
+        ];
+      }
+      {
+        trigger = [
+          {
+            platform = "mqtt";
+            topic = feederTopic deviceId "service/post";
+          }
+        ];
+        sensor = [
+          {
+            # Catch-all for ATTR_GET_SERVICE/DEVICE_PROPERTIES_SERVICE responses
+            # (both land on service/post, the "post" counterpart of the
+            # service/sub commands above) -- unlike event/post's fixed set of
+            # event kinds, these two return whatever fields the firmware
+            # decides to report, which isn't practical to pick apart field by
+            # field in Nix. State is just the ack code; the full response body
+            # is in the state attribute.
+            name = "Last Service Response";
+            unique_id = "${deviceId}_last_service_response";
+            default_entity_id = "sensor.${key}_last_service_response";
+            inherit device;
+            state = "{{ trigger.payload_json.code if trigger.payload_json.code is defined else this.state }}";
+            attributes = {
+              response = "{{ trigger.payload_json if trigger.payload_json else this.attributes.response | default({}) }}";
+            };
+            icon = "mdi:message-reply-text";
+            entity_category = "diagnostic";
+          }
+        ];
+      }
+    ];
 in
 {
   input_number = lib.listToAttrs (lib.concatMap feederNumberHelpers feeders);
   input_text = lib.listToAttrs (lib.concatMap feederTextHelpers feeders);
   input_datetime = lib.listToAttrs (lib.concatMap feederTimeHelpers feeders);
+  template = lib.concatMap feederTriggerSensors feeders;
   mqtt = {
     binary_sensor = lib.concatMap feederBinarySensors feeders;
     sensor = lib.concatMap feederSensors feeders;
