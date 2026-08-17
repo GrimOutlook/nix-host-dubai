@@ -79,6 +79,7 @@ class PetLibroScheduleLinkedSwitch(PetLibroBaseSwitch):
     """Switch to link or unlink feeder schedule propagation."""
 
     _attr_icon = "mdi:link-variant"
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coordinator, feeder_name: str, device_id: str):
         super().__init__(coordinator, feeder_name, device_id)
