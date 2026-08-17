@@ -1,0 +1,58 @@
+"""Text platform for PetLibro Feeders."""
+
+from homeassistant.components.text import TextEntity
+from homeassistant.core import callback
+from .const import DOMAIN
+
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up text entities for PetLibro entry."""
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    entities = []
+
+    for feeder in coordinator.feeders:
+        name = feeder["name"]
+        device_id = feeder["device_id"]
+        entities.append(PetLibroScheduleRepeatDaysText(coordinator, name, device_id))
+
+    async_add_entities(entities)
+
+
+class PetLibroScheduleRepeatDaysText(TextEntity):
+    """Text entity to configure 7-char Mon-Sun schedule repeat day bitmask."""
+
+    _attr_icon = "mdi:calendar-week"
+    _attr_pattern = "^[01]{7}$"
+
+    def __init__(self, coordinator, feeder_name: str, device_id: str):
+        self.coordinator = coordinator
+        self.feeder_name = feeder_name
+        self.device_id = device_id
+        self._attr_name = f"{feeder_name} Schedule Repeat Days"
+        self._attr_unique_id = f"{device_id}_schedule_repeat_days"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"plaf301_{device_id}")},
+            "name": feeder_name,
+            "manufacturer": "PETLIBRO",
+            "model": "PLAF301",
+        }
+
+    async def async_added_to_hass(self):
+        self.coordinator.add_listener(self._handle_coordinator_update)
+
+    async def async_will_remove_from_hass(self):
+        self.coordinator.remove_listener(self._handle_coordinator_update)
+
+    @callback
+    def _handle_coordinator_update(self):
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> str:
+        sched = self.coordinator.schedules.get(self.feeder_name, {})
+        return sched.get("repeat_day", "1111111")
+
+    async def async_set_value(self, value: str) -> None:
+        """Update repeat day bitmask and propagate if schedule linking is enabled."""
+        if len(value) == 7 and all(c in "01" for c in value):
+            await self.coordinator.async_update_schedule(self.feeder_name, repeat_day=value)

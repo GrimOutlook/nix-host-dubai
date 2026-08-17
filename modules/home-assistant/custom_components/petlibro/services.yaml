@@ -1,0 +1,95 @@
+feed:
+  name: Feed Pet
+  description: Dispenses a specified number of food portions immediately.
+  fields:
+    feeder:
+      name: Feeder Name
+      description: Target feeder name (e.g. feed-jem, feed-willow, feed-fern).
+      required: true
+      example: feed-willow
+    portions:
+      name: Portions
+      description: Number of portions to dispense.
+      required: false
+      default: 1
+      example: 2
+
+assign_collar:
+  name: Assign Pet Collar
+  description: Assigns an RFID collar tag to a pet name and pushes tag registration to feeder hardware.
+  fields:
+    feeder:
+      name: Feeder Name
+      description: Target feeder to sync RFID tag to.
+      required: true
+      example: feed-willow
+    pet_name:
+      name: Pet Name
+      description: Friendly name of the pet (e.g. Willow, Jem, Fern).
+      required: true
+      example: Willow
+    collar_tag:
+      name: Collar Tag Hex
+      description: RFID collar tag hexadecimal ID.
+      required: true
+      example: A1B2C3D4E5
+
+set_schedule:
+  name: Set Feeding Schedule
+  description: Updates feeding schedule time, portion count, repeat days, and sync options.
+  fields:
+    feeder:
+      name: Feeder Name
+      description: Target feeder name.
+      required: true
+      example: feed-willow
+    time:
+      name: Schedule Time
+      description: Execution time in HH:MM format.
+      required: false
+      example: "08:30"
+    portions:
+      name: Portions
+      description: Number of portions per scheduled feed.
+      required: false
+      example: 3
+    repeat_day:
+      name: Repeat Day Bitmask
+      description: 7-character string for Mon-Sun (e.g. 1111111 = everyday).
+      required: false
+      example: "1111111"
+    enabled:
+      name: Schedule Enabled
+      description: Set to true to enable schedule or false to pause.
+      required: false
+      example: true
+    linked:
+      name: Link Schedule
+      description: Set to true to automatically propagate schedule changes to other linked feeders.
+      required: false
+      example: true
+
+sync_schedules:
+  name: Sync Schedules Across Feeders
+  description: Propagates the source feeder's schedule settings to all other linked feeders.
+  fields:
+    source_feeder:
+      name: Source Feeder Name
+      description: Feeder whose schedule will be copied to all other linked feeders.
+      required: true
+      example: feed-willow
+
+set_schedule_enabled:
+  name: Toggle Schedule Enabled
+  description: Enables or disables (pauses) scheduled feeding on a feeder.
+  fields:
+    feeder:
+      name: Feeder Name
+      description: Target feeder name.
+      required: true
+      example: feed-willow
+    enabled:
+      name: Enabled State
+      description: True to enable, False to pause.
+      required: true
+      example: false

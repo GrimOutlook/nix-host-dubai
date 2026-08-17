@@ -33,6 +33,16 @@ let
       license = lib.licenses.mit;
     };
   };
+  petlibroComponent = pkgs.stdenvNoCC.mkDerivation {
+    pname = "home-assistant-petlibro";
+    version = "1.0.0";
+    src = ./custom_components/petlibro;
+    dontBuild = true;
+    installPhase = ''
+      mkdir -p $out/custom_components/petlibro
+      cp -r $src/* $out/custom_components/petlibro/
+    '';
+  };
 in
 {
   # Shared credential for the MQTT broker hosted on newyork (see nix-homelab).
@@ -66,10 +76,13 @@ in
 
       "mqtt"
     ];
-    customComponents = with pkgs.home-assistant-custom-components; [
-      frigate
-      gpio
-    ];
+    customComponents =
+      with pkgs.home-assistant-custom-components;
+      [
+        frigate
+        gpio
+      ]
+      ++ [ petlibroComponent ];
     # card-mod lets the Windy iframe's `ha-card` wrapper be styled directly --
     # used in lovelace.nix to disable pointer-events so the embedded map can't be
     # dragged/panned (Windy's embed2 iframe has no URL param for this).
