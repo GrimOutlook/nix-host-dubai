@@ -33,15 +33,11 @@ let
       license = lib.licenses.mit;
     };
   };
-  petlibroComponent = pkgs.stdenvNoCC.mkDerivation {
-    pname = "home-assistant-petlibro";
+  petlibroComponent = pkgs.buildHomeAssistantComponent {
+    owner = "grim";
+    domain = "petlibro";
     version = "1.0.0";
     src = ./custom_components/petlibro;
-    dontBuild = true;
-    installPhase = ''
-      mkdir -p $out/custom_components/petlibro
-      cp -r $src/* $out/custom_components/petlibro/
-    '';
   };
 in
 {

@@ -484,11 +484,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1786676661,
-        "narHash": "sha256-zrd5CU9ZULK4LWpemrftYGciLyJkbK82bQF8gRofS5k=",
+        "lastModified": 1786681588,
+        "narHash": "sha256-gPpxZUt74DIoEVQt0hCjk6vo7l4wt4jwivTfrL8JNgA=",
         "ref": "refs/heads/main",
-        "rev": "22c7ef168a87f99eaeaae5240ab15a55930e120f",
-        "revCount": 97,
+        "rev": "664e34b2068be1a7e273bc79d54b63775e04bb21",
+        "revCount": 98,
         "type": "git",
         "url": "ssh://git@github.com/GrimOutlook/nix-homelab"
       },
@@ -525,6 +525,40 @@
       "original": {
         "owner": "tenxsoydev",
         "repo": "karen-yank.nvim",
+        "type": "github"
+      }
+    },
+    "linux-hardened": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786385321,
+        "narHash": "sha256-bdkx4MW1QOk4XlyVbxzp6Alebe6bry7pFDSwIuKFM2w=",
+        "owner": "anthraxx",
+        "repo": "linux-hardened",
+        "rev": "ffb077ccdf0de144d84b5c4a03096ce85d9cab15",
+        "type": "github"
+      },
+      "original": {
+        "owner": "anthraxx",
+        "ref": "7.1",
+        "repo": "linux-hardened",
+        "type": "github"
+      }
+    },
+    "linux-hardened-zfs": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1782899731,
+        "narHash": "sha256-BVfxsVYY79UlIgHbxkj3k114IrdQJfaPwc2v/eED5f8=",
+        "owner": "anthraxx",
+        "repo": "linux-hardened",
+        "rev": "9a145596154fb550a38bff936c6a0ce1272d19f9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "anthraxx",
+        "ref": "v7.0.14-hardened1",
+        "repo": "linux-hardened",
         "type": "github"
       }
     },
@@ -583,6 +617,8 @@
         "home-manager": "home-manager_2",
         "import-tree": "import-tree",
         "karen-yank-nvim": "karen-yank-nvim",
+        "linux-hardened": "linux-hardened",
+        "linux-hardened-zfs": "linux-hardened-zfs",
         "llm-agents": "llm-agents",
         "microvm": "microvm",
         "nix-index-database": "nix-index-database",
@@ -599,11 +635,11 @@
         "wayfinder-nvim": "wayfinder-nvim"
       },
       "locked": {
-        "lastModified": 1786584685,
-        "narHash": "sha256-fPfws5OopXVyraHKdaH30UNim3hlTVFxFTIgjol20Wk=",
+        "lastModified": 1787003117,
+        "narHash": "sha256-uk2lAq/7hGOBZnFxo4Fgr4NflywYNWsu3OpQn+GNACk=",
         "owner": "GrimOutlook",
         "repo": "nix-config",
-        "rev": "a058383cdd7400a907e4223978fb045bb5762850",
+        "rev": "f494b0ec6c48dc6b42ff936a8c5bfc590c59ec6f",
         "type": "github"
       },
       "original": {
