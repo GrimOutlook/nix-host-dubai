@@ -10,10 +10,12 @@
         {
           type = "custom:advanced-camera-card";
           title = "Driveway";
+          live.controls.builtin = false;
           cameras = [
             {
               camera_entity = "camera.driveway";
               live_provider = "go2rtc";
+              go2rtc.modes = [ "mse" ];
             }
           ];
         }
@@ -89,20 +91,21 @@
       ];
     }
     {
-      type = "iframe";
-      aspect_ratio = "75%";
-      # https://embed.windy.com -- Windy's public embeddable widget,
-      # centered on the house's coordinates with the radar overlay.
-      # `marker=true` drops a pin at detailLat/detailLon (the house).
-      url = "https://embed.windy.com/embed2.html?lat=34.7608002429598&lon=-86.69216641164486&detailLat=34.7608002429598&detailLon=-86.69216641164486&width=650&height=450&zoom=8&level=surface&overlay=radar&product=radar&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&metricRain=in&radarRange=-1";
-      # Windy's embed2 iframe has no URL param to disable dragging, so
-      # this blocks all pointer interaction with the card instead --
-      # the map still animates/updates, it just can't be panned/zoomed.
-      card_mod.style = ''
-        ha-card {
-          pointer-events: none;
-        }
-      '';
+      # https://github.com/timmaurice/lovelace-windy-card
+      # Windy interactive weather map card, centered on the house's
+      # coordinates with the radar overlay and a pin at the location.
+      # `static_map = true` locks panning/zooming via the card's native
+      # interaction toggle.
+      type = "custom:windy-card";
+      latitude = 34.7608002429598;
+      longitude = -86.69216641164486;
+      overlay = "radar";
+      zoom = 8;
+      show_marker = true;
+      static_map = true;
+      aspect_ratio = "4:3";
+      metric_rain = "in";
+      default_mode = "map_only";
     }
   ];
 }

@@ -7,10 +7,12 @@
     {
       type = "custom:advanced-camera-card";
       title = "Library";
+      live.controls.builtin = false;
       cameras = [
         {
           camera_entity = "camera.library";
           live_provider = "go2rtc";
+          go2rtc.modes = [ "mse" ];
         }
       ];
     }

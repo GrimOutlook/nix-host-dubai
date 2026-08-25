@@ -11,7 +11,7 @@ let
   wanConfig = import ./wan.nix { inherit homelab; };
   automationsConfig = import ./automations.nix { };
   # Not packaged in nixpkgs (unlike the cards under
-  # pkgs.home-assistant-custom-lovelace-modules below), so it's fetched
+  # pkgs.home-assistant-custom-lovelace-modules below), so they are fetched
   # directly here -- upstream publishes a single prebuilt JS bundle per
   # GitHub release, which is simpler and just as reproducible as a
   # source build for a one-file lovelace card.
@@ -30,6 +30,24 @@ let
     meta = {
       description = "Weather forecast card for Home Assistant with hourly/daily toggle and trend charts";
       homepage = "https://github.com/troinine/ha-weather-forecast-card";
+      license = lib.licenses.mit;
+    };
+  };
+  windyCard = pkgs.stdenvNoCC.mkDerivation rec {
+    pname = "windy-card";
+    version = "1.14.0";
+    src = pkgs.fetchurl {
+      url = "https://github.com/timmaurice/lovelace-windy-card/releases/download/${version}/windy-card.js";
+      hash = "sha256-3esF1BHySMPTcjMw4Iiij7aKuqYzaI3g5B/2OxRsZ14=";
+    };
+    dontUnpack = true;
+    installPhase = ''
+      mkdir -p $out
+      cp $src $out/${pname}.js
+    '';
+    meta = {
+      description = "Windy.com weather map and spot forecast card for Home Assistant";
+      homepage = "https://github.com/timmaurice/lovelace-windy-card";
       license = lib.licenses.mit;
     };
   };
@@ -79,20 +97,20 @@ in
         gpio
       ]
       ++ [ petlibroComponent ];
-    # card-mod lets the Windy iframe's `ha-card` wrapper be styled directly --
-    # used in lovelace.nix to disable pointer-events so the embedded map can't be
-    # dragged/panned (Windy's embed2 iframe has no URL param for this).
     # weather-forecast-card (see weatherForecastCard above) renders weather.nws
     # -- its chart mode can plot apparent_temperature (feels-like) as its own
     # forecast line, which the previously-used stock weather-forecast card and
     # weather-chart-card can't do at all.
+    # windy-card embeds Windy interactive map & forecast directly.
     customLovelaceModules =
       with pkgs.home-assistant-custom-lovelace-modules;
       [
         advanced-camera-card
-        card-mod
       ]
-      ++ [ weatherForecastCard ];
+      ++ [
+        weatherForecastCard
+        windyCard
+      ];
 
     lovelaceConfig = lovelaceModule.lovelaceConfig;
 
