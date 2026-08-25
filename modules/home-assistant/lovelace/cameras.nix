@@ -12,7 +12,10 @@
         {
           camera_entity = "camera.driveway";
           live_provider = "go2rtc";
-          go2rtc.modes = [ "mse" ];
+          go2rtc.modes = [
+            "hls"
+            "mse"
+          ];
         }
       ];
     }
@@ -24,7 +27,10 @@
         {
           camera_entity = "camera.front_door";
           live_provider = "go2rtc";
-          go2rtc.modes = [ "mse" ];
+          go2rtc.modes = [
+            "hls"
+            "mse"
+          ];
         }
       ];
     }
@@ -36,7 +42,10 @@
         {
           camera_entity = "camera.back_gate";
           live_provider = "go2rtc";
-          go2rtc.modes = [ "mse" ];
+          go2rtc.modes = [
+            "hls"
+            "mse"
+          ];
         }
       ];
     }
@@ -48,7 +57,10 @@
         {
           camera_entity = "camera.front_lawn";
           live_provider = "go2rtc";
-          go2rtc.modes = [ "mse" ];
+          go2rtc.modes = [
+            "hls"
+            "mse"
+          ];
         }
       ];
     }
@@ -60,7 +72,10 @@
         {
           camera_entity = "camera.library";
           live_provider = "go2rtc";
-          go2rtc.modes = [ "mse" ];
+          go2rtc.modes = [
+            "hls"
+            "mse"
+          ];
         }
       ];
     }

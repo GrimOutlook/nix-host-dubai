@@ -12,7 +12,10 @@
         {
           camera_entity = "camera.library";
           live_provider = "go2rtc";
-          go2rtc.modes = [ "mse" ];
+          go2rtc.modes = [
+            "hls"
+            "mse"
+          ];
         }
       ];
     }

@@ -15,7 +15,10 @@
             {
               camera_entity = "camera.driveway";
               live_provider = "go2rtc";
-              go2rtc.modes = [ "mse" ];
+              go2rtc.modes = [
+                "hls"
+                "mse"
+              ];
             }
           ];
         }
