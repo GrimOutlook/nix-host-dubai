@@ -1,83 +1,13 @@
-{ }:
+{ mkCameraCard ? (import ./helpers.nix { }).mkCameraCard }:
 {
   title = "Cameras";
   path = "cameras";
   icon = "mdi:cctv";
   cards = [
-    {
-      type = "custom:advanced-camera-card";
-      title = "Driveway";
-      live.controls.builtin = false;
-      cameras = [
-        {
-          camera_entity = "camera.driveway";
-          live_provider = "go2rtc";
-          go2rtc.modes = [
-            "hls"
-            "mse"
-          ];
-        }
-      ];
-    }
-    {
-      type = "custom:advanced-camera-card";
-      title = "Front Door";
-      live.controls.builtin = false;
-      cameras = [
-        {
-          camera_entity = "camera.front_door";
-          live_provider = "go2rtc";
-          go2rtc.modes = [
-            "hls"
-            "mse"
-          ];
-        }
-      ];
-    }
-    {
-      type = "custom:advanced-camera-card";
-      title = "Back Gate";
-      live.controls.builtin = false;
-      cameras = [
-        {
-          camera_entity = "camera.back_gate";
-          live_provider = "go2rtc";
-          go2rtc.modes = [
-            "hls"
-            "mse"
-          ];
-        }
-      ];
-    }
-    {
-      type = "custom:advanced-camera-card";
-      title = "Front Lawn";
-      live.controls.builtin = false;
-      cameras = [
-        {
-          camera_entity = "camera.front_lawn";
-          live_provider = "go2rtc";
-          go2rtc.modes = [
-            "hls"
-            "mse"
-          ];
-        }
-      ];
-    }
-    {
-      type = "custom:advanced-camera-card";
-      title = "Library";
-      live.controls.builtin = false;
-      cameras = [
-        {
-          camera_entity = "camera.library";
-          live_provider = "go2rtc";
-          go2rtc.modes = [
-            "hls"
-            "mse"
-          ];
-        }
-      ];
-    }
+    (mkCameraCard "Driveway" "camera.driveway")
+    (mkCameraCard "Front Door" "camera.front_door")
+    (mkCameraCard "Back Gate" "camera.back_gate")
+    (mkCameraCard "Front Lawn" "camera.front_lawn")
+    (mkCameraCard "Library" "camera.library")
   ];
 }

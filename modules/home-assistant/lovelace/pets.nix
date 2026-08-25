@@ -1,24 +1,10 @@
-{ }:
+{ mkCameraCard ? (import ./helpers.nix { }).mkCameraCard }:
 {
   title = "Pets";
   path = "pets";
   icon = "mdi:paw";
   cards = [
-    {
-      type = "custom:advanced-camera-card";
-      title = "Library";
-      live.controls.builtin = false;
-      cameras = [
-        {
-          camera_entity = "camera.library";
-          live_provider = "go2rtc";
-          go2rtc.modes = [
-            "hls"
-            "mse"
-          ];
-        }
-      ];
-    }
+    (mkCameraCard "Library" "camera.library")
     {
       type = "entities";
       title = "Pet Feeders";

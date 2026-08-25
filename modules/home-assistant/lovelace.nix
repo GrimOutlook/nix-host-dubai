@@ -1,8 +1,9 @@
 { }:
 let
-  homeView = import ./lovelace/home.nix { };
-  camerasView = import ./lovelace/cameras.nix { };
-  petsView = import ./lovelace/pets.nix { };
+  helpers = import ./lovelace/helpers.nix { };
+  homeView = import ./lovelace/home.nix helpers;
+  camerasView = import ./lovelace/cameras.nix helpers;
+  petsView = import ./lovelace/pets.nix helpers;
 in
 {
   # `lovelaceConfig` below only registers the Home view as an *extra*

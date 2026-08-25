@@ -1,4 +1,4 @@
-{ }:
+{ mkCameraCard ? (import ./helpers.nix { }).mkCameraCard }:
 {
   title = "Home";
   path = "home";
@@ -7,21 +7,7 @@
     {
       type = "vertical-stack";
       cards = [
-        {
-          type = "custom:advanced-camera-card";
-          title = "Driveway";
-          live.controls.builtin = false;
-          cameras = [
-            {
-              camera_entity = "camera.driveway";
-              live_provider = "go2rtc";
-              go2rtc.modes = [
-                "hls"
-                "mse"
-              ];
-            }
-          ];
-        }
+        (mkCameraCard "Driveway" "camera.driveway")
         {
           type = "entities";
           title = "House Internet Usage";
