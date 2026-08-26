@@ -7,22 +7,52 @@
     (mkCameraCard "Library" "camera.library")
     {
       type = "entities";
-      title = "Pet Feeders";
+      title = "Jem";
+      icon = "mdi:cat";
       entities = [
         {
           entity = "sensor.feed_jem_last_fed";
-          name = "Jem Last Fed";
+          name = "Last Fed";
           icon = "mdi:food-drumstick";
         }
+        {
+          entity = "sensor.feed_jem_last_activity";
+          name = "Last Activity";
+          icon = "mdi:rfid";
+        }
+      ];
+    }
+    {
+      type = "entities";
+      title = "Willow";
+      icon = "mdi:cat";
+      entities = [
         {
           entity = "sensor.feed_willow_last_fed";
-          name = "Willow Last Fed";
+          name = "Last Fed";
           icon = "mdi:food-drumstick";
         }
         {
+          entity = "sensor.feed_willow_last_activity";
+          name = "Last Activity";
+          icon = "mdi:rfid";
+        }
+      ];
+    }
+    {
+      type = "entities";
+      title = "Fern";
+      icon = "mdi:cat";
+      entities = [
+        {
           entity = "sensor.feed_fern_last_fed";
-          name = "Fern Last Fed";
+          name = "Last Fed";
           icon = "mdi:food-drumstick";
+        }
+        {
+          entity = "sensor.feed_fern_last_activity";
+          name = "Last Activity";
+          icon = "mdi:rfid";
         }
       ];
     }

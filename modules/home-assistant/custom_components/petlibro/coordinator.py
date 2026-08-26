@@ -69,6 +69,7 @@ class PetLibroCoordinator:
                 "last_fed": None,
                 "last_scanned_tag": None,
                 "last_scanned_pet": None,
+                "last_activity": None,
                 "bowl_activity": None,
                 "last_error": None,
                 "last_boot": None,
@@ -184,6 +185,7 @@ class PetLibroCoordinator:
                 tag = payload.get("calibrationTag", "")
                 member_id = payload.get("memberId", "")
                 state["last_scanned_tag"] = tag
+                state["last_activity"] = now_iso
                 
                 # Match tag or member_id against registered pet names
                 pet_name = self.get_pet_name_for_tag(tag) or member_id or tag

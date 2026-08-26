@@ -632,6 +632,21 @@ let
             icon = "mdi:paw";
           }
           {
+            # PET_IDENTIFY_EVENT timestamp when feeder last read collar.
+            name = "${label} Last Activity";
+            unique_id = "${deviceId}_last_activity";
+            default_entity_id = "sensor.${key}_last_activity";
+            state = ''
+              {%- if trigger.payload_json.cmd == 'PET_IDENTIFY_EVENT' -%}
+                {{- now().isoformat() -}}
+              {%- else -%}
+                {{- this.state if this.state not in ['unknown', 'unavailable'] else None -}}
+              {%- endif -%}
+            '';
+            device_class = "timestamp";
+            icon = "mdi:rfid";
+          }
+          {
             # MACHINE_INFRARED_EVENT: the bowl's break-beam/presence sensor.
             # FINDINGS.md only confirms *that* this fires, not any field names
             # inside it (unlike the events above, which were seen with full

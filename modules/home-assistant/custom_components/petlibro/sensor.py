@@ -22,6 +22,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             PetLibroRSSISensor(coordinator, name, device_id),
             PetLibroLastFedSensor(coordinator, name, device_id),
             PetLibroPetScannedSensor(coordinator, name, device_id),
+            PetLibroLastActivitySensor(coordinator, name, device_id),
             PetLibroBowlActivitySensor(coordinator, name, device_id),
             PetLibroLastErrorSensor(coordinator, name, device_id),
             PetLibroLastBootSensor(coordinator, name, device_id),
@@ -116,6 +117,23 @@ class PetLibroPetScannedSensor(PetLibroBaseSensor):
             "collar_tag": tag,
             "pet_name": pet_name,
         }
+
+
+class PetLibroLastActivitySensor(PetLibroBaseSensor):
+    """Timestamp sensor of last RFID collar read."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:rfid"
+
+    def __init__(self, coordinator, feeder_name: str, device_id: str):
+        super().__init__(coordinator, feeder_name, device_id)
+        self._attr_name = f"{feeder_name} Last Activity"
+        self._attr_unique_id = f"{device_id}_last_activity"
+
+    @property
+    def native_value(self):
+        state = self.coordinator.feeder_states.get(self.feeder_name, {})
+        return state.get("last_activity")
 
 
 class PetLibroBowlActivitySensor(PetLibroBaseSensor):
