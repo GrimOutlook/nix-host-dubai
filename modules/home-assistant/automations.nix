@@ -83,7 +83,7 @@
     }
     {
       alias = "Feeder low food persistent notification";
-      description = "Create a persistent notification when a pet feeder reports LOW_FOOD.";
+      description = "Create a persistent notification and turn on low food alert boolean when a pet feeder reports LOW_FOOD.";
       trigger = [
         {
           platform = "state";
@@ -97,6 +97,12 @@
       ];
       action = [
         {
+          service = "input_boolean.turn_on";
+          target = {
+            entity_id = "{{ trigger.entity_id | replace('sensor.', 'input_boolean.') | replace('_last_error', '_low_food') }}";
+          };
+        }
+        {
           service = "persistent_notification.create";
           data = {
             title = "Feeder Low Food Alert";
@@ -109,7 +115,7 @@
     }
     {
       alias = "Feeder feed jam persistent notification";
-      description = "Create or dismiss a persistent notification when a pet feeder detects or clears a feed jam.";
+      description = "Create or dismiss a persistent notification and update feed jam alert boolean when a pet feeder detects or clears a feed jam.";
       trigger = [
         {
           platform = "state";
@@ -144,6 +150,12 @@
               ];
               sequence = [
                 {
+                  service = "input_boolean.turn_on";
+                  target = {
+                    entity_id = "{{ trigger.entity_id | replace('binary_sensor.', 'input_boolean.') | replace('_feed_jam', '_jam') }}";
+                  };
+                }
+                {
                   service = "persistent_notification.create";
                   data = {
                     title = "Feeder Jam Alert";
@@ -162,6 +174,12 @@
               ];
               sequence = [
                 {
+                  service = "input_boolean.turn_off";
+                  target = {
+                    entity_id = "{{ trigger.entity_id | replace('binary_sensor.', 'input_boolean.') | replace('_feed_jam', '_jam') }}";
+                  };
+                }
+                {
                   service = "persistent_notification.dismiss";
                   data = {
                     notification_id = "{{ trigger.entity_id | replace('binary_sensor.', '') | replace('_feed_jam', '') }}_jam";
@@ -170,6 +188,33 @@
               ];
             }
           ];
+        }
+      ];
+      mode = "parallel";
+    }
+    {
+      alias = "Dismiss feeder persistent notification on boolean turn off";
+      description = "Dismiss persistent notification when an alert boolean is turned off.";
+      trigger = [
+        {
+          platform = "state";
+          entity_id = [
+            "input_boolean.feed_jem_low_food"
+            "input_boolean.feed_willow_low_food"
+            "input_boolean.feed_fern_low_food"
+            "input_boolean.feed_jem_jam"
+            "input_boolean.feed_willow_jam"
+            "input_boolean.feed_fern_jam"
+          ];
+          to = "off";
+        }
+      ];
+      action = [
+        {
+          service = "persistent_notification.dismiss";
+          data = {
+            notification_id = "{{ trigger.entity_id | replace('input_boolean.', '') }}";
+          };
         }
       ];
       mode = "parallel";

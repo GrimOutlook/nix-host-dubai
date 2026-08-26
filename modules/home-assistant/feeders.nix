@@ -246,6 +246,22 @@ let
         has_date = false;
       })
     ];
+  feederBooleanHelpers =
+    { name, deviceId }:
+    let
+      key = feederKey name;
+      label = feederLabel name;
+    in
+    [
+      (lib.nameValuePair "${key}_low_food" {
+        name = "${label} Feeder Low Food Alert";
+        icon = "mdi:food-drumstick-off";
+      })
+      (lib.nameValuePair "${key}_jam" {
+        name = "${label} Feeder Jam Alert";
+        icon = "mdi:alert-circle";
+      })
+    ];
   # Individual on/off toggles for the handful of ATTR_SET_SERVICE fields
   # (mqtt_command_reference.md's ~30-field bulk setter) that are actually
   # meant for regular use, rather than one giant form for all of them --
@@ -779,6 +795,7 @@ in
   input_number = lib.listToAttrs (lib.concatMap feederNumberHelpers feeders);
   input_text = lib.listToAttrs (lib.concatMap feederTextHelpers feeders);
   input_datetime = lib.listToAttrs (lib.concatMap feederTimeHelpers feeders);
+  input_boolean = lib.listToAttrs (lib.concatMap feederBooleanHelpers feeders);
   template = lib.concatMap feederTriggerSensors feeders;
   mqtt = {
     binary_sensor = lib.concatMap feederBinarySensors feeders;

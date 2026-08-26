@@ -33,8 +33,8 @@
           type = "conditional";
           conditions = [
             {
-              entity = "persistent_notification.feed_jem_low_food";
-              state_not = "unavailable";
+              entity = "input_boolean.feed_jem_low_food";
+              state = "on";
             }
           ];
           card = {
@@ -50,9 +50,9 @@
                 icon = "mdi:bell-off";
                 tap_action = {
                   action = "call-service";
-                  service = "persistent_notification.dismiss";
-                  data = {
-                    notification_id = "feed_jem_low_food";
+                  service = "input_boolean.turn_off";
+                  target = {
+                    entity_id = "input_boolean.feed_jem_low_food";
                   };
                 };
               }
@@ -63,8 +63,8 @@
           type = "conditional";
           conditions = [
             {
-              entity = "persistent_notification.feed_willow_low_food";
-              state_not = "unavailable";
+              entity = "input_boolean.feed_willow_low_food";
+              state = "on";
             }
           ];
           card = {
@@ -80,9 +80,9 @@
                 icon = "mdi:bell-off";
                 tap_action = {
                   action = "call-service";
-                  service = "persistent_notification.dismiss";
-                  data = {
-                    notification_id = "feed_willow_low_food";
+                  service = "input_boolean.turn_off";
+                  target = {
+                    entity_id = "input_boolean.feed_willow_low_food";
                   };
                 };
               }
@@ -93,8 +93,8 @@
           type = "conditional";
           conditions = [
             {
-              entity = "persistent_notification.feed_fern_low_food";
-              state_not = "unavailable";
+              entity = "input_boolean.feed_fern_low_food";
+              state = "on";
             }
           ];
           card = {
@@ -110,9 +110,9 @@
                 icon = "mdi:bell-off";
                 tap_action = {
                   action = "call-service";
-                  service = "persistent_notification.dismiss";
-                  data = {
-                    notification_id = "feed_fern_low_food";
+                  service = "input_boolean.turn_off";
+                  target = {
+                    entity_id = "input_boolean.feed_fern_low_food";
                   };
                 };
               }
@@ -123,8 +123,8 @@
           type = "conditional";
           conditions = [
             {
-              entity = "persistent_notification.feed_jem_jam";
-              state_not = "unavailable";
+              entity = "input_boolean.feed_jem_jam";
+              state = "on";
             }
           ];
           card = {
@@ -140,9 +140,9 @@
                 icon = "mdi:bell-off";
                 tap_action = {
                   action = "call-service";
-                  service = "persistent_notification.dismiss";
-                  data = {
-                    notification_id = "feed_jem_jam";
+                  service = "input_boolean.turn_off";
+                  target = {
+                    entity_id = "input_boolean.feed_jem_jam";
                   };
                 };
               }
@@ -153,8 +153,8 @@
           type = "conditional";
           conditions = [
             {
-              entity = "persistent_notification.feed_willow_jam";
-              state_not = "unavailable";
+              entity = "input_boolean.feed_willow_jam";
+              state = "on";
             }
           ];
           card = {
@@ -170,9 +170,9 @@
                 icon = "mdi:bell-off";
                 tap_action = {
                   action = "call-service";
-                  service = "persistent_notification.dismiss";
-                  data = {
-                    notification_id = "feed_willow_jam";
+                  service = "input_boolean.turn_off";
+                  target = {
+                    entity_id = "input_boolean.feed_willow_jam";
                   };
                 };
               }
@@ -183,8 +183,8 @@
           type = "conditional";
           conditions = [
             {
-              entity = "persistent_notification.feed_fern_jam";
-              state_not = "unavailable";
+              entity = "input_boolean.feed_fern_jam";
+              state = "on";
             }
           ];
           card = {
@@ -200,9 +200,9 @@
                 icon = "mdi:bell-off";
                 tap_action = {
                   action = "call-service";
-                  service = "persistent_notification.dismiss";
-                  data = {
-                    notification_id = "feed_fern_jam";
+                  service = "input_boolean.turn_off";
+                  target = {
+                    entity_id = "input_boolean.feed_fern_jam";
                   };
                 };
               }
