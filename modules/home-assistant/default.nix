@@ -59,6 +59,12 @@ let
   };
 in
 {
+  # zwave.nix is a NixOS module rather than a Home Assistant `config` fragment
+  # like the `import`s above -- it configures the zwave-js-ui *service* that
+  # sits between Home Assistant and the Z-Wave controller, so it has to go
+  # through `imports`.
+  imports = [ ./zwave.nix ];
+
   # Shared credential for the MQTT broker hosted on newyork (see nix-homelab).
   # Home Assistant no longer supports configuring the MQTT broker connection
   # declaratively (broker/username/password moved to UI-only config flow), so
