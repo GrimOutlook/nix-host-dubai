@@ -7,20 +7,29 @@ let
   # label "Jem". Kept here rather than shared with feeders.nix since this
   # file only ever needs the pet's short name, not the full feeder identity.
   pets = [
-    "Jem"
-    "Willow"
-    "Fern"
+    {
+      name = "Jem";
+      icon = "mdi:dog";
+    }
+    {
+      name = "Willow";
+      icon = "mdi:cat";
+    }
+    {
+      name = "Fern";
+      icon = "mdi:cat";
+    }
   ];
   petKey = lib.toLower;
   mkPetCard =
-    name:
+    { name, icon }:
     let
       key = petKey name;
     in
     {
       type = "entities";
       title = name;
-      icon = "mdi:cat";
+      inherit icon;
       entities = [
         {
           type = "conditional";
@@ -132,12 +141,13 @@ in
   icon = "mdi:paw";
   cards = [
     (mkCameraCard "Library" "camera.library")
-  ]
-  ++ map mkPetCard pets
-  ++ [
+    {
+      type = "horizontal-stack";
+      cards = map mkPetCard pets;
+    }
     {
       type = "vertical-stack";
-      cards = lib.concatMap mkAlertCards pets;
+      cards = lib.concatMap (pet: mkAlertCards pet.name) pets;
     }
   ];
 }
