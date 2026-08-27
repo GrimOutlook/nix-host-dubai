@@ -62,6 +62,16 @@ let
   # an entity that only cares about one kind renders `this.state` for every
   # other kind, preserving its current state instead of rendering `None`
   # (which HA parses as an invalid value, resetting the entity to `unknown`).
+  #
+  # Feed Jam used to live here too (state_topic on event/post, same
+  # execStep logic now in feederTriggerSensors below) -- moved to the
+  # template platform for the same restore-across-restart reason documented
+  # on feederSensors below: MQTT platform entities go `unavailable` the
+  # instant HA's MQTT client disconnects at shutdown and never recover a
+  # real value from that snapshot, so every redeploy reset it to `unknown`
+  # until the feeder's next jam-relevant event (which could be hours away),
+  # leaving anything that keys off its on/off state (e.g. the Pets
+  # dashboard's Status row) with nothing to match.
   feederBinarySensors =
     { name, deviceId }:
     [
@@ -78,35 +88,6 @@ let
         # being so long a real outage takes minutes to notice.
         expire_after = 150;
         device_class = "connectivity";
-      }
-      {
-        # execStep's GRAIN_BLOCKING/GRAIN_BLOCKED/GRAIN_STUCK values
-        # (mqtt_command_reference.md's "Common Error/Status Strings") are
-        # jam states reported on the same GRAIN_OUTPUT_EVENT stream "Last
-        # Fed" below already reads -- unlike the ERROR_EVENT-sourced
-        # sensors further down, this one gets a real binary on/off because
-        # its clear condition is just as well-documented as its set
-        # condition (a normal GRAIN_END/finished completion).
-        name = "Feed Jam";
-        unique_id = "${deviceId}_feed_jam";
-        device = feederDevice { inherit name deviceId; };
-        state_topic = feederTopic deviceId "event/post";
-        value_template = ''
-          {%- if value_json.cmd == 'GRAIN_OUTPUT_EVENT' -%}
-            {%- if value_json.execStep in ['GRAIN_BLOCKING', 'GRAIN_BLOCKED', 'GRAIN_STUCK'] -%}
-              {{- 'ON' -}}
-            {%- elif value_json.execStep == 'GRAIN_END' or value_json.finished -%}
-              {{- 'OFF' -}}
-            {%- else -%}
-              {{- this.state | upper if (this is defined and this.state in ['on', 'off']) else 'OFF' -}}
-            {%- endif -%}
-          {%- else -%}
-            {{- this.state | upper if (this is defined and this.state in ['on', 'off']) else 'OFF' -}}
-          {%- endif -%}
-        '';
-        payload_on = "ON";
-        payload_off = "OFF";
-        device_class = "problem";
       }
     ];
   # Only the sensor whose value is always fresh off the wire lives here.
@@ -583,6 +564,33 @@ let
           {
             platform = "mqtt";
             topic = feederTopic deviceId "event/post";
+          }
+        ];
+        binary_sensor = [
+          {
+            # execStep's GRAIN_BLOCKING/GRAIN_BLOCKED/GRAIN_STUCK values
+            # (mqtt_command_reference.md's "Common Error/Status Strings") are
+            # jam states reported on the same GRAIN_OUTPUT_EVENT stream
+            # "Last Fed" above already reads -- unlike the ERROR_EVENT-sourced
+            # sensors further down, this one gets a real binary on/off
+            # because its clear condition is just as well-documented as its
+            # set condition (a normal GRAIN_END/finished completion).
+            # Trigger-based template platform (not MQTT, see
+            # feederBinarySensors above) so `this.state` survives an HA
+            # restart instead of resetting to `unknown`.
+            name = "${label} Feed Jam";
+            unique_id = "${deviceId}_feed_jam";
+            default_entity_id = "binary_sensor.${key}_feed_jam";
+            state = ''
+              {%- if trigger.payload_json.cmd == 'GRAIN_OUTPUT_EVENT' and trigger.payload_json.execStep in ['GRAIN_BLOCKING', 'GRAIN_BLOCKED', 'GRAIN_STUCK'] -%}
+                {{- true -}}
+              {%- elif trigger.payload_json.cmd == 'GRAIN_OUTPUT_EVENT' and (trigger.payload_json.execStep == 'GRAIN_END' or trigger.payload_json.finished) -%}
+                {{- false -}}
+              {%- else -%}
+                {{- this.state == 'on' -}}
+              {%- endif -%}
+            '';
+            device_class = "problem";
           }
         ];
         sensor = [

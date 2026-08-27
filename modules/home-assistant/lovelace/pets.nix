@@ -43,7 +43,7 @@ let
             type = "text";
             name = "Status";
             icon = "mdi:check-circle";
-            state = "✅ Working";
+            text = "✅ Working";
           };
         }
         {
@@ -58,7 +58,7 @@ let
             type = "text";
             name = "Status";
             icon = "mdi:close-circle";
-            state = "❌ Jammed";
+            text = "❌ Jammed";
           };
         }
         {
@@ -142,7 +142,7 @@ in
   cards = [
     (mkCameraCard "Library" "camera.library")
     {
-      type = "horizontal-stack";
+      type = "vertical-stack";
       cards = map mkPetCard pets;
     }
     {
