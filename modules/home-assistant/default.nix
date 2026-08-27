@@ -169,8 +169,8 @@ in
     ];
   };
 
-  # The Living Room TV (busan, MAC 7c:0a:3f:79:bb:8a in homelab/hosts.nix,
-  # DHCP-reserved at 10.1.0.4) constantly probes Home Assistant's UPnP/SSDP
+  # The Living Room TV (`living-room-tv`, MAC 7c:0a:3f:79:bb:8a in
+  # homelab/hosts.nix) constantly probes Home Assistant's UPnP/SSDP
   # event-callback port (tcp/40000) -- roughly 200 SYNs an hour. HA is not
   # actually consuming that traffic (no DLNA/cast integration is configured),
   # so we do NOT want to open the port; we just want to stop it flooding the
@@ -185,8 +185,15 @@ in
   # equivalent iptables `extraCommands` is silently ignored under the nftables
   # backend, so it must not be used here.) The TV connects over IPv4, so
   # matching on `ip saddr` is sufficient.
+  #
+  # The address is taken from `homelab` rather than written out: it is assigned
+  # by `assignIps`, which hands out addresses in sorted-hostname order, so
+  # every host after an inserted name shifts by one. A literal here silently
+  # stops matching the TV and starts matching whichever host inherited the
+  # address -- which is exactly what had happened to the previous hardcoded
+  # `10.1.0.4` (by then `brussels`, while the TV had moved to `10.1.0.18`).
   networking.firewall.extraInputRules = ''
-    ip saddr 10.1.0.4 tcp dport 40000 drop
+    ip saddr ${homelab.hosts.living-room-tv.net.ip} tcp dport 40000 drop
   '';
 
   users.groups.gpio.members = [ "hass" ];
