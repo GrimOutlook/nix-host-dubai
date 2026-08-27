@@ -89,6 +89,36 @@ in
     };
   };
 
+  # The upstream unit runs the service inside `RootDirectory=%t/zwave-js-ui`
+  # with only /nix/store bind-mounted, so it starts with no /etc at all and
+  # therefore no resolver configuration. Everything Z-Wave still works -- the
+  # controller is reached by IP and Home Assistant over loopback -- but the
+  # daily firmware-update check calls out to firmware.zwave-js.io and fails
+  # with "Cannot check for firmware updates: fetch failed (ZW0261)".
+  #
+  # Name resolution needs two files: resolv.conf supplies the nameserver, and
+  # nsswitch.conf tells glibc to consult DNS for hosts. Both are read-only, and
+  # neither widens the sandbox in any other direction.
+  #
+  # `BindReadOnlyPaths` is a list-valued unit option, so this appends to the
+  # module's own `/nix/store` entry rather than replacing it.
+  systemd.services.zwave-js-ui.serviceConfig.BindReadOnlyPaths = [
+    "/etc/resolv.conf"
+    "/etc/nsswitch.conf"
+  ];
+
+  # DNS alone isn't enough -- the check is an HTTPS fetch, and this Node is
+  # built against the OpenSSL default CA store rather than a compiled-in one,
+  # so inside the empty root it failed TLS with
+  # UNABLE_TO_GET_ISSUER_CERT_LOCALLY even once the hostname resolved.
+  #
+  # Pointing at the bundle in the Nix store means no third bind mount:
+  # /nix/store is already mounted in the sandbox, so the path just works. The
+  # usual /etc/ssl/certs/ca-certificates.crt would NOT have -- it is a symlink
+  # into /etc/static, which does not exist inside the root directory.
+  systemd.services.zwave-js-ui.environment.SSL_CERT_FILE =
+    "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+
   # The zwave-js-ui module has no `openFirewall`, so open the console port by
   # hand. Only the console needs to be reachable off-host: Home Assistant
   # reaches the WS server over loopback, so 3000 is deliberately left closed.
