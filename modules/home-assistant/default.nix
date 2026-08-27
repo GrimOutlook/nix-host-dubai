@@ -7,7 +7,7 @@
 let
   feedersConfig = import ./feeders.nix { inherit lib; };
   weatherConfig = import ./weather.nix { };
-  lovelaceModule = import ./lovelace.nix { };
+  lovelaceModule = import ./lovelace.nix { inherit lib; };
   wanConfig = import ./wan.nix { inherit homelab; };
   automationsConfig = import ./automations.nix { };
   # Not packaged in nixpkgs (unlike the cards under
