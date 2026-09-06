@@ -364,6 +364,44 @@ let
         optimistic = true;
         icon = "mdi:speedometer";
       }
+      {
+        # Ghidra/radare2-confirmed (stock_backup_8M_sanitized.bin, ARM
+        # Thumb-2, ATTR_SET_SERVICE handler at 0x0e01a2e4): coverOpenMode is
+        # a string enum, not the "int" mqtt_command_reference.md originally
+        # described -- same class of bug as coverCloseSpeed above. The
+        # handler reads it via valuestring (item offset 0x10, at 0xe01a690),
+        # then strncmp's (ROM strncmp 0x10110cc9) against "KEEP_CLOSE"
+        # (-> 0), "CUSTOM" (-> 2), and "KEEP_OPEN" (-> 1), storing the enum
+        # to the config struct at [r4+0x18] and persisting it to flash
+        # (0x003eb000 via 0xe0132cc), so the mode survives reboots/
+        # reconnects. A bare int leaves valuestring NULL and no-ops silently,
+        # same failure mode as coverCloseSpeed / an unrecognized barnDoorState.
+        #
+        # This is the collar gate: KEEP_CLOSE = lid opens only for an
+        # authorized RFID collar (the normal smart-feeder mode), KEEP_OPEN =
+        # lid stays open permanently regardless of collar, CUSTOM = the
+        # device's scheduled mode. Distinct from the Lid cover entity above,
+        # which is a one-shot SWITCH_DOOR_SERVICE open/close, not a standing
+        # mode.
+        #
+        # Value mapping is high-confidence (directly disassembled, mirrors
+        # the live-confirmed coverCloseSpeed/barnDoorState string-vs-int
+        # patterns) but the KEEP_OPEN payload itself hasn't yet been
+        # confirmed against live hardware -- watch WAREHOUSE_DOOR_EVENT /
+        # ATTR_PUSH_EVENT on event/post for the echo the first time.
+        name = "Cover Mode";
+        unique_id = "${deviceId}_cover_mode";
+        device = feederDevice { inherit name deviceId; };
+        command_topic = feederTopic deviceId "service/sub";
+        command_template = "{{ {'cmd': 'ATTR_SET_SERVICE', 'coverOpenMode': value} | tojson }}";
+        options = [
+          "KEEP_CLOSE"
+          "KEEP_OPEN"
+          "CUSTOM"
+        ];
+        optimistic = true;
+        icon = "mdi:door-sliding";
+      }
     ];
   feederButtons =
     { name, deviceId }:
