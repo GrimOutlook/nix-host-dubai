@@ -46,7 +46,7 @@
               # relative /api/... path is resolved against whichever HA URL
               # the app is already connected to (the internal LAN URL when
               # home), avoiding the WAN -> caddy(newyork) -> HA(dubai) ->
-              # frigate(pyongyang) round trip the hard-coded external URL
+              # frigate(dunkirk) round trip the hard-coded external URL
               # forced on every notification.
               image = "/api/frigate/notifications/{{ trigger.payload_json['after']['id'] }}/thumbnail.jpg";
               tag = "{{ trigger.payload_json['after']['id'] }}";
