@@ -1,6 +1,6 @@
 { homelab, pkgs, ... }:
 let
-  # The SONOFF Z-Wave 800 PoE Dongle Max (Dongle-MZG23). Its DHCP reservation
+  # The SONOFF Z-Wave 800 PoE Max (`zwave-dongle`). Its DHCP reservation
   # lives in `homelab/hosts.nix` (MAC 1c:c3:ab:13:14:07), so the address comes
   # from there rather than being repeated here -- same as `wan.nix`.
   #
@@ -8,7 +8,7 @@ let
   # upstream zwave-js-ui unit runs under `RootDirectory=%t/zwave-js-ui` with
   # only /nix/store bind-mounted, so the service has no /etc/resolv.conf and
   # cannot resolve names.
-  dongleIp = homelab.hosts.dongle-mzg23.net.ip;
+  zwaveDongleIp = homelab.hosts.zwave-dongle.net.ip;
 
   # Settings that zwave-js-ui would otherwise only accept through its web
   # console, declared here instead. `ZWAVE_EXTERNAL_SETTINGS` points at a JSON
@@ -36,7 +36,7 @@ let
   );
 in
 {
-  # Z-Wave, driven by a SONOFF Z-Wave 800 PoE Dongle Max (Dongle-MZG23).
+  # Z-Wave, driven by a SONOFF Z-Wave 800 PoE Max (`zwave-dongle`).
   #
   # Unlike a USB stick, this controller is a *network* device: it takes PoE on
   # its own ethernet port and republishes the Z-Wave serial protocol over TCP.
@@ -46,17 +46,18 @@ in
   # The data path is:
   #
   #   Z-Wave nodes
-  #     <-radio->                  Dongle-MZG23
-  #     <-tcp://<dongle-ip>:6638-> zwave-js-ui (this host)
+  #     <-radio->                  zwave-dongle
+  #     <-tcp://<zwave-dongle-ip>:6638-> zwave-js-ui (this host)
   #     <-ws://127.0.0.1:3000->    Home Assistant `zwave_js` integration
   #
-  # NOTE: the dongle's *MQTT* feature is not part of that path. It only
-  # publishes the dongle's own settings/diagnostic entities (and any
+  # NOTE: the `zwave-dongle`'s *MQTT* feature is not part of that path. It only
+  # publishes the `zwave-dongle`'s own settings/diagnostic entities (and any
   # eWeLink-Remote R5/S-mate sub-devices paired to it) via MQTT discovery.
   # Actual Z-Wave device control is the tcp://:6638 leg above. The MQTT
   # integration is already configured on this host for Frigate, so those
-  # dongle entities will appear on their own if the dongle's MQTT client is
-  # pointed at newyork's broker -- but it is not required for Z-Wave to work.
+  # `zwave-dongle` entities will appear on their own if the `zwave-dongle`'s
+  # MQTT client is pointed at newyork's broker -- but it is not required for
+  # Z-Wave to work.
   #
   # `services.zwave-js` (bare zwave-js-server) deliberately isn't used here:
   # it passes `serialPort` to the binary as an argv and types it as
@@ -83,7 +84,7 @@ in
       # `ZwaveClient.connect()` upstream). With this set, zwave-js-ui also
       # stops enumerating local serial ports and greys the field out in the
       # UI, which is what makes the choice declarative rather than advisory.
-      ZWAVE_PORT = "tcp://${dongleIp}:6638";
+      ZWAVE_PORT = "tcp://${zwaveDongleIp}:6638";
 
       ZWAVE_EXTERNAL_SETTINGS = externalSettings;
     };
