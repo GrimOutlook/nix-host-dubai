@@ -99,6 +99,23 @@ let
       license = lib.licenses.mit;
     };
   };
+  # The NixOS Home Assistant module uses a card's version as its resource
+  # cache-buster. Include the exact package output identity so rebuilt bundles
+  # cannot reuse a stale parent file with different hashed child chunks.
+  advancedCameraCard =
+    let
+      package = pkgs.home-assistant-custom-lovelace-modules.advanced-camera-card;
+      cacheVersion = "${package.version}-${builtins.substring 0 12 (builtins.hashString "sha256" package.outPath)}";
+    in
+    pkgs.stdenvNoCC.mkDerivation {
+      pname = package.pname;
+      version = cacheVersion;
+      dontUnpack = true;
+      installPhase = ''
+        mkdir -p "$out"
+        cp -R ${package}/. "$out/"
+      '';
+    };
   petlibroComponent = pkgs.buildHomeAssistantComponent {
     owner = "grim";
     domain = "petlibro";
@@ -171,7 +188,7 @@ in
     customLovelaceModules =
       with pkgs.home-assistant-custom-lovelace-modules;
       [
-        advanced-camera-card
+        advancedCameraCard
         card-mod
       ]
       ++ [
