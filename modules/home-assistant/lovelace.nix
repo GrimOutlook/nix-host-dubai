@@ -4,6 +4,13 @@ let
   homeView = import ./lovelace/home.nix helpers;
   camerasView = import ./lovelace/cameras.nix helpers;
   petsView = import ./lovelace/pets.nix (helpers // { inherit lib; });
+  keymasterView = {
+    strategy = {
+      type = "custom:keymaster-tabs";
+      title = "Keymaster";
+      icon = "mdi:lock-smart";
+    };
+  };
 in
 {
   # `lovelaceConfig` below only registers the Home view as an *extra*
@@ -33,10 +40,17 @@ in
 
   lovelaceConfig = {
     title = "Longleaf";
+    resources = [
+      {
+        url = "/keymaster_files/keymaster.js";
+        type = "module";
+      }
+    ];
     views = [
       homeView
       camerasView
       petsView
+      keymasterView
     ];
   };
 }

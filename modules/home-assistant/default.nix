@@ -10,6 +10,54 @@ let
   lovelaceModule = import ./lovelace.nix { inherit lib; };
   wanConfig = import ./wan.nix { inherit homelab; };
   automationsConfig = import ./automations.nix { };
+  keymasterVersion = "0.5.3";
+  keymasterSource = pkgs.fetchurl {
+    url = "https://github.com/FutureTense/keymaster/releases/download/v${keymasterVersion}/keymaster.zip";
+    hash = "sha256-M0AR5UFsSLcrXozrCSk+WSFjPoI61KgI31j8bxMg3xE=";
+  };
+  keymasterComponent = pkgs.buildHomeAssistantComponent {
+    owner = "FutureTense";
+    domain = "keymaster";
+    version = keymasterVersion;
+    format = "unzip";
+    sourceRoot = ".";
+    src = keymasterSource;
+  };
+  keymasterLovelaceModule = pkgs.stdenvNoCC.mkDerivation {
+    pname = "keymaster";
+    version = keymasterVersion;
+    dontUnpack = true;
+    installPhase = ''
+      install -Dm444 \
+        ${keymasterComponent}/custom_components/keymaster/www/generated/keymaster.js \
+         $out/keymaster.js
+       '';
+  };
+  keymasterTabsLovelaceModule = pkgs.stdenvNoCC.mkDerivation {
+    pname = "keymaster-tabs";
+    version = "1.0.3";
+    dontUnpack = true;
+    installPhase = ''
+      install -Dm444 ${./lovelace/keymaster-tabs.js} $out/keymaster-tabs.js
+    '';
+  };
+  tabbedCard = pkgs.stdenvNoCC.mkDerivation rec {
+    pname = "tabbed-card";
+    version = "0.3.3";
+    src = pkgs.fetchurl {
+      url = "https://github.com/kinghat/tabbed-card/releases/download/v${version}/tabbed-card.js";
+      hash = "sha256-bq1fmXdAtrTxYtJoMqSypvvLwFB7jpRw8PaiUa6OkBo=";
+    };
+    dontUnpack = true;
+    installPhase = ''
+      install -Dm444 $src $out/${pname}.js
+    '';
+    meta = {
+      description = "Tabbed card for Home Assistant Lovelace";
+      homepage = "https://github.com/kinghat/tabbed-card";
+      license = lib.licenses.bsd3;
+    };
+  };
   # Not packaged in nixpkgs (unlike the cards under
   # pkgs.home-assistant-custom-lovelace-modules below), so they are fetched
   # directly here -- upstream publishes a single prebuilt JS bundle per
@@ -96,13 +144,25 @@ in
 
       "mqtt"
     ];
+    # Keymaster imports its ZHA provider while Home Assistant discovers the
+    # config flow, even though this host uses Z-Wave JS. Keep ZHA itself
+    # disabled; provide only the Python dependencies needed for that import
+    # path, including the dependencies of Home Assistant Hardware.
+    extraPackages = ps: [
+      ps.zha
+      ps.universal-silabs-flasher
+      ps.ha-silabs-firmware-client
+    ];
     customComponents =
       with pkgs.home-assistant-custom-components;
       [
         frigate
         gpio
       ]
-      ++ [ petlibroComponent ];
+      ++ [
+        petlibroComponent
+        keymasterComponent
+      ];
     # weather-forecast-card (see weatherForecastCard above) renders weather.nws
     # -- its chart mode can plot apparent_temperature (feels-like) as its own
     # forecast line, which the previously-used stock weather-forecast card and
@@ -112,10 +172,14 @@ in
       with pkgs.home-assistant-custom-lovelace-modules;
       [
         advanced-camera-card
+        card-mod
       ]
       ++ [
         weatherForecastCard
         windyCard
+        keymasterLovelaceModule
+        keymasterTabsLovelaceModule
+        tabbedCard
       ];
 
     lovelaceConfig = lovelaceModule.lovelaceConfig;
