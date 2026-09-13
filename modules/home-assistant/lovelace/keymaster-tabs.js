@@ -1,9 +1,23 @@
 const VIEW_OPTIONS = ["icon", "path", "theme", "visible"];
+const TAB_STYLES = {
+  "--mdc-tab-horizontal-padding": "8px",
+  "--mdc-tab-stacked-height": "64px",
+  "--mdc-typography-button-font-size": "12px",
+};
 
 function errorCard(message) {
   return {
     type: "markdown",
     content: `## Keymaster Error\n\n${message}`,
+  };
+}
+
+function tabbedCard(tabs, attributes = {}) {
+  return {
+    type: "custom:tabbed-card",
+    styles: TAB_STYLES,
+    attributes,
+    tabs,
   };
 }
 
@@ -74,6 +88,11 @@ function panelCard(card) {
         ha-card {
           margin: 16px;
         }
+        @media (max-width: 600px) {
+          ha-card {
+            margin: 8px;
+          }
+        }
       `,
     },
   };
@@ -128,7 +147,7 @@ class KeymasterTabsStrategy extends HTMLElement {
         if (metadata.badges?.length) {
           cards.push({
             type: "grid",
-            columns: 4,
+            columns: 2,
             square: false,
             cards: metadata.badges,
           });
@@ -136,10 +155,7 @@ class KeymasterTabsStrategy extends HTMLElement {
 
         cards.push(
           slotTabs.length
-            ? {
-                type: "custom:tabbed-card",
-                tabs: slotTabs,
-              }
+            ? tabbedCard(slotTabs, { minWidth: true })
             : errorCard("No code slots are configured for this lock."),
         );
         lockTabs.push(lockTab(lock, metadata, cards, config.icon || "mdi:lock-smart"));
@@ -162,7 +178,7 @@ class KeymasterTabsStrategy extends HTMLElement {
     const view = {
       title,
       type: "panel",
-      cards: [panelCard({ type: "custom:tabbed-card", tabs: lockTabs })],
+      cards: [panelCard(tabbedCard(lockTabs, { minWidth: true, stacked: true }))],
     };
 
     for (const option of VIEW_OPTIONS) {
