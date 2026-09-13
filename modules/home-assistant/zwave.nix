@@ -10,6 +10,28 @@ let
   # cannot resolve names.
   zwaveDongleIp = homelab.hosts.zwave-dongle.net.ip;
 
+  # NixOS 26.05 still ships zwave-js-ui 11.18.0. Use the upstream 11.24.0
+  # package here, which brings zwave-js 15.29.0 and its background-RSSI polling
+  # fix without changing the host's broader nixpkgs release.
+  zwaveJsUiSource = pkgs.fetchFromGitHub {
+    owner = "zwave-js";
+    repo = "zwave-js-ui";
+    tag = "v11.24.0";
+    hash = "sha256-KX90w0J4ASGxyFbv8l8dNoNqIURXuOeNl6E3dmFzbC4=";
+  };
+  zwaveJsUiPackage = pkgs.zwave-js-ui.overrideAttrs (_: {
+    version = "11.24.0";
+    src = zwaveJsUiSource;
+    npmDepsHash = "sha256-ECuBLrAIfWgCLPbKOFmZvq/6MhB58o3JjTrRf5Dip2g=";
+    # overrideAttrs retains buildNpmPackage's already-evaluated npmDeps, so
+    # explicitly regenerate it for the replacement package-lock.json.
+    npmDeps = pkgs.fetchNpmDeps {
+      name = "zwave-js-ui-11.24.0-npm-deps";
+      src = zwaveJsUiSource;
+      hash = "sha256-ECuBLrAIfWgCLPbKOFmZvq/6MhB58o3JjTrRf5Dip2g=";
+    };
+  });
+
   # Settings that zwave-js-ui would otherwise only accept through its web
   # console, declared here instead. `ZWAVE_EXTERNAL_SETTINGS` points at a JSON
   # file whose keys are merged over the `zwave` section of the app's own
@@ -66,6 +88,7 @@ in
   # can actually satisfy.
   services.zwave-js-ui = {
     enable = true;
+    package = zwaveJsUiPackage;
 
     # Required by the module, and used for nothing but `DeviceAllow=` on the
     # unit -- upstream documents it as "only used to grant permissions to the
