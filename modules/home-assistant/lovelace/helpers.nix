@@ -10,7 +10,7 @@ rec {
         {
           inherit camera_entity;
           live_provider = "go2rtc";
-          go2rtc.modes = [ "mjpeg" ];
+          go2rtc.modes = [ "mse" ];
         }
       ];
     };
