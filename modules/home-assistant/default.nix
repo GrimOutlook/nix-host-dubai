@@ -10,28 +10,32 @@ let
   lovelaceModule = import ./lovelace.nix { inherit lib pkgs; };
   wanConfig = import ./wan.nix { inherit homelab; };
   automationsConfig = import ./automations.nix { };
-  keymasterVersion = "0.5.3";
-  keymasterSource = pkgs.fetchurl {
-    url = "https://github.com/FutureTense/keymaster/releases/download/v${keymasterVersion}/keymaster.zip";
-    hash = "sha256-M0AR5UFsSLcrXozrCSk+WSFjPoI61KgI31j8bxMg3xE=";
-  };
-  keymasterComponent = pkgs.buildHomeAssistantComponent {
-    owner = "FutureTense";
-    domain = "keymaster";
-    version = keymasterVersion;
+  # Pinned to 3.3.0: the newest release whose minimum Home Assistant
+  # (2026.5.0) is satisfied by this host's nixpkgs. 4.x+ require newer HA,
+  # and 6.0 has a breaking migration -- read its upgrade guide before bumping.
+  lockCodeManagerVersion = "3.3.0";
+  lockCodeManagerComponent = pkgs.buildHomeAssistantComponent {
+    owner = "raman325";
+    domain = "lock_code_manager";
+    version = lockCodeManagerVersion;
     format = "unzip";
     sourceRoot = ".";
-    src = keymasterSource;
+    src = pkgs.fetchurl {
+      url = "https://github.com/raman325/lock_code_manager/releases/download/${lockCodeManagerVersion}/lock_code_manager.zip";
+      hash = "sha256-rzjnrHjKnIC+XOX00BWCd5z5N22j1doM0ByndJb05KY=";
+    };
   };
-  keymasterLovelaceModule = pkgs.stdenvNoCC.mkDerivation {
-    pname = "keymaster";
-    version = keymasterVersion;
+  # The integration serves this dashboard strategy itself, but resources are in
+  # YAML mode here, so it must also be registered via customLovelaceModules.
+  lockCodeManagerLovelaceModule = pkgs.stdenvNoCC.mkDerivation {
+    pname = "lock-code-manager";
+    version = lockCodeManagerVersion;
     dontUnpack = true;
     installPhase = ''
       install -Dm444 \
-        ${keymasterComponent}/custom_components/keymaster/www/generated/keymaster.js \
-         $out/keymaster.js
-       '';
+        ${lockCodeManagerComponent}/custom_components/lock_code_manager/www/generated/lock-code-manager.js \
+        $out/lock-code-manager.js
+    '';
   };
   # Not packaged in nixpkgs (unlike the cards under
   # pkgs.home-assistant-custom-lovelace-modules below), so they are fetched
@@ -136,12 +140,13 @@ in
 
       "mqtt"
     ];
-    # Keymaster imports its ZHA provider while Home Assistant discovers the
-    # config flow, even though this host uses Z-Wave JS. Keep ZHA itself
-    # disabled; provide only the Python dependencies needed for that import
-    # path, including the dependencies of Home Assistant Hardware.
+    # Lock Code Manager imports all of its lock providers (ZHA, Matter, ...)
+    # up front, even though this host only uses Z-Wave JS. Keep those
+    # integrations disabled; provide only the Python dependencies needed for
+    # the imports, including those of Home Assistant Hardware.
     extraPackages = ps: [
       ps.zha
+      ps.python-matter-server
       ps.universal-silabs-flasher
       ps.ha-silabs-firmware-client
     ];
@@ -153,7 +158,7 @@ in
       ]
       ++ [
         petlibroComponent
-        keymasterComponent
+        lockCodeManagerComponent
       ];
     # weather-forecast-card (see weatherForecastCard above) renders weather.nws
     # -- its chart mode can plot apparent_temperature (feels-like) as its own
@@ -168,7 +173,7 @@ in
       ++ [
         weatherForecastCard
         windyCard
-        keymasterLovelaceModule
+        lockCodeManagerLovelaceModule
       ];
 
     lovelaceConfig = lovelaceModule.lovelaceConfig;

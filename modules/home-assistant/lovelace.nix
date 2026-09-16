@@ -29,14 +29,14 @@ in
       title = "Longleaf";
       icon = "mdi:view-dashboard";
     };
-    # Keymaster's own generated dashboard (one view per configured lock).
-    # Its strategy JS is loaded via keymasterLovelaceModule in default.nix.
-    keymaster-locks = {
+    # Lock Code Manager's generated dashboard (one view per configuration).
+    # Its strategy JS is loaded via lockCodeManagerLovelaceModule in default.nix.
+    lock-codes = {
       mode = "yaml";
-      filename = "${pkgs.writeText "keymaster-dashboard.yaml" (
-        builtins.toJSON { strategy.type = "custom:keymaster"; }
+      filename = "${pkgs.writeText "lock-code-manager-dashboard.yaml" (
+        builtins.toJSON { strategy.type = "custom:lock-code-manager"; }
       )}";
-      title = "Keymaster";
+      title = "Lock Codes";
       icon = "mdi:lock-smart";
       show_in_sidebar = true;
     };
