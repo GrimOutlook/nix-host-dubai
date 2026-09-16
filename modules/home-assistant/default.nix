@@ -7,7 +7,7 @@
 let
   feedersConfig = import ./feeders.nix { inherit lib; };
   weatherConfig = import ./weather.nix { };
-  lovelaceModule = import ./lovelace.nix { inherit lib; };
+  lovelaceModule = import ./lovelace.nix { inherit lib pkgs; };
   wanConfig = import ./wan.nix { inherit homelab; };
   automationsConfig = import ./automations.nix { };
   keymasterVersion = "0.5.3";
@@ -32,31 +32,6 @@ let
         ${keymasterComponent}/custom_components/keymaster/www/generated/keymaster.js \
          $out/keymaster.js
        '';
-  };
-  keymasterTabsLovelaceModule = pkgs.stdenvNoCC.mkDerivation {
-    pname = "keymaster-tabs";
-    version = "1.0.3";
-    dontUnpack = true;
-    installPhase = ''
-      install -Dm444 ${./lovelace/keymaster-tabs.js} $out/keymaster-tabs.js
-    '';
-  };
-  tabbedCard = pkgs.stdenvNoCC.mkDerivation rec {
-    pname = "tabbed-card";
-    version = "0.3.3";
-    src = pkgs.fetchurl {
-      url = "https://github.com/kinghat/tabbed-card/releases/download/v${version}/tabbed-card.js";
-      hash = "sha256-bq1fmXdAtrTxYtJoMqSypvvLwFB7jpRw8PaiUa6OkBo=";
-    };
-    dontUnpack = true;
-    installPhase = ''
-      install -Dm444 $src $out/${pname}.js
-    '';
-    meta = {
-      description = "Tabbed card for Home Assistant Lovelace";
-      homepage = "https://github.com/kinghat/tabbed-card";
-      license = lib.licenses.bsd3;
-    };
   };
   # Not packaged in nixpkgs (unlike the cards under
   # pkgs.home-assistant-custom-lovelace-modules below), so they are fetched
@@ -189,14 +164,11 @@ in
       with pkgs.home-assistant-custom-lovelace-modules;
       [
         advancedCameraCard
-        card-mod
       ]
       ++ [
         weatherForecastCard
         windyCard
         keymasterLovelaceModule
-        keymasterTabsLovelaceModule
-        tabbedCard
       ];
 
     lovelaceConfig = lovelaceModule.lovelaceConfig;

@@ -1,16 +1,9 @@
-{ lib }:
+{ lib, pkgs }:
 let
   helpers = import ./lovelace/helpers.nix { };
   homeView = import ./lovelace/home.nix helpers;
   camerasView = import ./lovelace/cameras.nix helpers;
   petsView = import ./lovelace/pets.nix (helpers // { inherit lib; });
-  keymasterView = {
-    strategy = {
-      type = "custom:keymaster-tabs";
-      title = "Keymaster";
-      icon = "mdi:lock-smart";
-    };
-  };
 in
 {
   # `lovelaceConfig` below only registers the Home view as an *extra*
@@ -36,21 +29,25 @@ in
       title = "Longleaf";
       icon = "mdi:view-dashboard";
     };
+    # Keymaster's own generated dashboard (one view per configured lock).
+    # Its strategy JS is loaded via keymasterLovelaceModule in default.nix.
+    keymaster-locks = {
+      mode = "yaml";
+      filename = "${pkgs.writeText "keymaster-dashboard.yaml" (
+        builtins.toJSON { strategy.type = "custom:keymaster"; }
+      )}";
+      title = "Keymaster";
+      icon = "mdi:lock-smart";
+      show_in_sidebar = true;
+    };
   };
 
   lovelaceConfig = {
     title = "Longleaf";
-    resources = [
-      {
-        url = "/keymaster_files/keymaster.js";
-        type = "module";
-      }
-    ];
     views = [
       homeView
       camerasView
       petsView
-      keymasterView
     ];
   };
 }
