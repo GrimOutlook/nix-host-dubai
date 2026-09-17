@@ -1,12 +1,11 @@
 # dubai
 
-Raspberry Pi 5 (aarch64, NVMe root) running Home Assistant.
+Raspberry Pi 5 (aarch64, NVMe root). Formerly the Home Assistant host.
 
-## Services
-
-| Service | Description |
-| --- | --- |
-| [home-assistant](https://github.com/home-assistant/core) | Home Automation (MQTT broker is hosted on `newyork`) |
+Home Assistant and zwave-js-ui moved to `dunkirk` on 2026-09-16 (see
+[plans/DUNKIRK_MIGRATION.md](plans/DUNKIRK_MIGRATION.md)), and this host no
+longer runs any services. The old state is still in `/var/lib/hass` and
+`/var/lib/private/zwave-js-ui` until the Pi is decommissioned.
 
 ## Layout
 

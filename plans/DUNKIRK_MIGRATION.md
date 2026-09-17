@@ -1,6 +1,8 @@
 # Plan: move Home Assistant from dubai to dunkirk
 
-Status: investigation only. No changes have been made.
+Status: cutover done on 2026-09-16. Home Assistant and zwave-js-ui run on
+dunkirk. Remaining: re-point the Frigate integration and drop dunkirk's
+`migration.nix`, then decommission dubai (see "Cleanup when dubai is retired").
 
 Moving Home Assistant to dunkirk looks doable, and most of the config moves as
 is:
